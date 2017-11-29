@@ -1,14 +1,12 @@
 package io.github.mike10004.vhs;
 
 import com.google.common.net.MediaType;
-import de.sstoehr.harreader.model.HarContent;
-import de.sstoehr.harreader.model.HarResponse;
+import edu.umass.cs.benchlab.har.HarContent;
+import edu.umass.cs.benchlab.har.HarResponse;
 import fi.iki.elonen.NanoHTTPD;
-import fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.nanochamp.server.NanoResponse;
 
 import javax.annotation.Nullable;
-import java.util.Base64;
 
 public interface ResponseManager {
 
@@ -19,7 +17,7 @@ public interface ResponseManager {
             @Override
             public NanoHTTPD.Response toResponse(HarResponse harResponse) {
                 NanoResponse rb = NanoResponse.status(harResponse.getStatus());
-                harResponse.getHeaders().forEach(header -> {
+                harResponse.getHeaders().getHeaders().forEach(header -> {
                     rb.header(header.getName(), header.getValue());
                 });
                 HarContent content = harResponse.getContent();

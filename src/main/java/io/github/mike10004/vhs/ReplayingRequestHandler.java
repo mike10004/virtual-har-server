@@ -1,6 +1,6 @@
 package io.github.mike10004.vhs;
 
-import de.sstoehr.harreader.model.HarEntry;
+import edu.umass.cs.benchlab.har.HarEntry;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Response;
@@ -26,9 +26,9 @@ public class ReplayingRequestHandler implements io.github.mike10004.nanochamp.se
     @Nullable
     @Override
     public Response serve(IHTTPSession session) {
-        ParsedEntry request;
+        ParsedRequest request;
         try {
-            request = ParsedEntry.parseNanoRequest(session);
+            request = ParsedRequest.parseNanoRequest(session);
         } catch (IOException e) {
             log.error("failed to read from incoming request", e);
             return NanoResponse.status(500).plainTextUtf8("Internal server error");

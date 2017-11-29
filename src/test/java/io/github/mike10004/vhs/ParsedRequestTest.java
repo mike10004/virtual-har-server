@@ -8,7 +8,7 @@ import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ParsedEntryTest {
+class ParsedRequestTest {
     @Test
     void create() {
         fail("not yet implemented");
@@ -21,11 +21,11 @@ class ParsedEntryTest {
 
     @Test
     void parseQuery() {
-        Multimap<String, String> q = ParsedEntry.parseQuery(URI.create("http://example.com/hello"));
+        Multimap<String, String> q = ParsedRequest.parseQuery(URI.create("http://example.com/hello"));
         assertNull(q);
-        q = ParsedEntry.parseQuery(URI.create("http://example.com/hello?foo=bar"));
+        q = ParsedRequest.parseQuery(URI.create("http://example.com/hello?foo=bar"));
         assertEquals(ImmutableMultimap.of("foo", "bar"), q);
-        q = ParsedEntry.parseQuery(URI.create("http://example.com/hello?"));
+        q = ParsedRequest.parseQuery(URI.create("http://example.com/hello?"));
         assertEquals(ImmutableMultimap.of(), q);
     }
 

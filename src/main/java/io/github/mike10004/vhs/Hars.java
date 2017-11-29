@@ -6,9 +6,9 @@ import com.google.common.collect.Multimap;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Ints;
-import de.sstoehr.harreader.model.HarContent;
-import de.sstoehr.harreader.model.HarPostData;
-import de.sstoehr.harreader.model.HarPostDataParam;
+import edu.umass.cs.benchlab.har.HarContent;
+import edu.umass.cs.benchlab.har.HarPostData;
+import edu.umass.cs.benchlab.har.HarPostDataParams;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +17,6 @@ import javax.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -46,10 +45,10 @@ public class Hars {
     }
 
     @Nullable
-    static byte[] translate(String contentType, @Nullable List<HarPostDataParam> params, @Nullable String text, @Nullable Long length,
+    static byte[] translate(String contentType, @Nullable HarPostDataParams params, @Nullable String text, @Nullable Long length,
                             @SuppressWarnings("SameParameterValue") @Nullable String encoding,
                             @SuppressWarnings("unused") @Nullable String comment, MessageDirection direction) {
-        if (params != null && !params.isEmpty()) {
+        if (params != null && !params.getPostDataParams().isEmpty()) {
             throw new UnsupportedOperationException("not yet implemented: params -> body translation");
         }
         if (text == null) {

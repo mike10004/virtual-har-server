@@ -3,7 +3,6 @@ package io.github.mike10004.vhs;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.gson.GsonBuilder;
-import de.sstoehr.harreader.model.HttpMethod;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.nanochamp.server.NanoControl;
@@ -74,7 +73,7 @@ public class HarMaker {
         }
 
         private void provideBody(HttpRequestBase request) {
-            if (this.request.method == HttpMethod.POST || this.request.method == HttpMethod.PUT) {
+            if ("POST".equalsIgnoreCase(this.request.method) || "PUT".equalsIgnoreCase(this.request.method)) {
                 if (this.request.body != null) {
                     ((HttpEntityEnclosingRequestBase) request).setEntity(new ByteArrayEntity(this.request.body));
                 }
@@ -87,17 +86,17 @@ public class HarMaker {
                     .setPort(localSocket.getPort())
                     .setScheme("http").build();
             HttpRequestBase base;
-            switch (request.method) {
-                case GET:
+            switch (request.method.toUpperCase()) {
+                case "GET":
                     base = new HttpGet(uri);
                     break;
-                case POST:
+                case "POST":
                     base = new HttpPost(uri);
                     break;
-                case DELETE:
+                case "DELETE":
                     base = new HttpDelete(uri);
                     break;
-                case PUT:
+                case "PUT":
                     base = new HttpPut(uri);
                     break;
                 default:
