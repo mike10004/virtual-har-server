@@ -28,12 +28,18 @@ public class Hars {
 
     @Nullable
     public static byte[] translate(HarContent content) {
+        if (content == null) {
+            return null;
+        }
         Long length = content.getSize();
         return translate(content.getMimeType(), null, content.getText(), length, null, content.getComment(), MessageDirection.RESPONSE);
     }
 
     @Nullable
     public static byte[] translate(HarPostData content, Multimap<String, String> requestHeaders) {
+        if (content == null) {
+            return null;
+        }
         @Nullable Long length = requestHeaders.get(HttpHeaders.CONTENT_LENGTH).stream().findFirst().map(Long::valueOf).orElse(null);
         return translate(content.getMimeType(), content.getParams(), content.getText(), length, null, content.getComment(), MessageDirection.REQUEST);
     }

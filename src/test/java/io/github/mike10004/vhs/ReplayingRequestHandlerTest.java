@@ -1,6 +1,7 @@
 package io.github.mike10004.vhs;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
@@ -32,7 +33,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.net.URI;
 import java.util.AbstractMap.SimpleImmutableEntry;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
@@ -44,25 +44,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ReplayingRequestHandlerTest {
 
+    final static ImmutableList<EntrySpec> specs = ImmutableList.of(
+            new EntrySpec(RequestSpec.get(URI.create("http://example.com/one")), NanoResponse.status(200).plainTextUtf8("one")),
+            new EntrySpec(RequestSpec.get(URI.create("http://example.com/two")), NanoResponse.status(200).plainTextUtf8("two"))
+    );
+
     @Test
     void serve() throws Exception {
-        List<EntrySpec> specs = Arrays.asList(
-                new EntrySpec(RequestSpec.get(URI.create("http://example.com/one")), NanoResponse.status(200).plainTextUtf8("one")),
-                new EntrySpec(RequestSpec.get(URI.create("http://example.com/two")), NanoResponse.status(200).plainTextUtf8("two"))
-        );
-        List<RequestSpec> requestsToMake = specs.stream().map(s -> s.request).collect(Collectors.toList());
-        requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));
-        File harFile = File.createTempFile("har-replay-test", ".har");
-        harFile.deleteOnExit();
-        new HarMaker().produceHarFile(specs, harFile);
-        System.out.format("har file: %s%n", harFile);
+        File harFile = new File(getClass().getResource("/replay-test-1.har").toURI());
         try (Reader reader = Files.asCharSource(harFile, UTF_8).openStream()) {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             gson.toJson(new JsonParser().parse(reader), System.out);
         }
         System.out.println();
         Heuristic heuristic = BasicHeuristic.factory().createHeuristic(harFile);
-        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.createDefault());
+        List<RequestSpec> requestsToMake = specs.stream().map(s -> s.request).collect(Collectors.toList());
+        requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.createDefault());
         int NOT_FOUND_CODE = 404;
         NanoServer server = NanoServer.builder()
                 .session(requestHandler)
@@ -74,7 +71,7 @@ class ReplayingRequestHandlerTest {
             HttpClientBuilder clientBuilder = HttpClients.custom()
                     .setProxy(new HttpHost(proxyAddress.getHost(), proxyAddress.getPort(), "http"));
             try (CloseableHttpClient client = clientBuilder.build()) {
-                for (RequestSpec requestSpec: requestsToMake) {
+                for (RequestSpec requestSpec : requestsToMake) {
                     HttpUriRequest request = new HttpGet(requestSpec.url);
                     System.out.format("request: %s%n", request);
                     try (CloseableHttpResponse response = client.execute(request)) {

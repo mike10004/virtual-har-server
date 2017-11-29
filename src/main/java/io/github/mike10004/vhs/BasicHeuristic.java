@@ -90,7 +90,7 @@ public class BasicHeuristic implements Heuristic {
 
     public int rate(ParsedRequest entryRequest, ParsedRequest request) {
         // String name;
-        URI requestUrl = request.parsedUrl;
+        URI requestUrl = request.url;
         Multimap<String, String> requestHeaders = request.indexedHeaders;
         @Nullable Multimap<String, String> requestQuery = request.query;
         // method, host and pathname must match
@@ -100,10 +100,10 @@ public class BasicHeuristic implements Heuristic {
         if (!entryRequest.method.equals(request.method)) { // TODO replace with enum != enum
             return 0;
         }
-        if (!entryRequest.parsedUrl.getHost().equals(requestUrl.getHost())) {
+        if (!entryRequest.url.getHost().equals(requestUrl.getHost())) {
             return 0;
         }
-        if (!entryRequest.parsedUrl.getPath().equals(requestUrl.getPath())) {
+        if (!entryRequest.url.getPath().equals(requestUrl.getPath())) {
             return 0;
         }
         int points = INCREMENT; // One point for matching above requirements

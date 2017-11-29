@@ -27,16 +27,16 @@ import java.util.stream.Stream;
 class ParsedRequest {
 
     public final NanoHTTPD.Method method;
-    public final URI parsedUrl;
+    public final URI url;
     @Nullable
     public final ImmutableMultimap<String, String> query;
     public final ImmutableMultimap<String, String> indexedHeaders;
     @Nullable
     private final byte[] body;
 
-    private ParsedRequest(NanoHTTPD.Method method, URI parsedUrl, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
+    private ParsedRequest(NanoHTTPD.Method method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
         this.method = Objects.requireNonNull(method);
-        this.parsedUrl = Objects.requireNonNull(parsedUrl);
+        this.url = Objects.requireNonNull(url);
         this.query = query == null ? null : ImmutableMultimap.copyOf(query);
         this.indexedHeaders = ImmutableMultimap.copyOf(indexedHeaders);
         this.body = body == null ? null : Arrays.copyOf(body, body.length);
