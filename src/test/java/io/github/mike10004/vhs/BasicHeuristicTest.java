@@ -25,8 +25,8 @@ class BasicHeuristicTest {
     })
     void rate_zero(String method, String url) {
         BasicHeuristic h = new BasicHeuristic();
-        ParsedRequest entryRequest = createRequest(method, url);
-        ParsedRequest request = createRequest("GET", "http://rightdomain.com/correct/path");
+        ParsedRequest entryRequest = Tests.createRequest(method, url);
+        ParsedRequest request = Tests.createRequest("GET", "http://rightdomain.com/correct/path");
         int rating = h.rate(entryRequest, request);
         assertEquals(0, rating, "rating should be zero");
     }
@@ -41,14 +41,10 @@ class BasicHeuristicTest {
     })
     void rate_aboveDefaultThreshold(String method, String url) {
         BasicHeuristic h = new BasicHeuristic();
-        ParsedRequest entryRequest = createRequest(method, url);
-        ParsedRequest request = createRequest("GET", "http://rightdomain.com/correct/path");
+        ParsedRequest entryRequest = Tests.createRequest(method, url);
+        ParsedRequest request = Tests.createRequest("GET", "http://rightdomain.com/correct/path");
         int rating = h.rate(entryRequest, request);
         assertTrue(rating > BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE, () -> "expected rating above default threshold: " + rating);
-    }
-
-    protected ParsedRequest createRequest(String method, String url) {
-        return new ParsedRequest.MemoryRequest(NanoHTTPD.Method.valueOf(method), URI.create(url), null, ImmutableMultimap.of(), null);
     }
 
 }

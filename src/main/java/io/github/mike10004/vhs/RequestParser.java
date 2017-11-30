@@ -1,19 +1,14 @@
 package io.github.mike10004.vhs;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.net.MediaType;
 import fi.iki.elonen.NanoHTTPD;
 import io.github.mike10004.vhs.ParsedRequest.MemoryRequest;
-import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
 
@@ -38,27 +33,18 @@ public class RequestParser<E> {
     /**
      * Creates a lowercase-keyed multimap from a list of headers.
      */
-    @VisibleForTesting
     protected Multimap<String, String> indexHeaders(Stream<? extends Entry<String, String>> entryHeaders) {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        entryHeaders.forEach(header -> {
-            headers.put(header.getKey().toLowerCase(), header.getValue());
-        });
-        return headers;
+        return ParsedRequest.indexHeaders(entryHeaders);
     }
 
+    /**
+     * Creates a multimap from the parameters specified in a URI.
+     * @param uri the URI
+     * @return the multimap
+     */
     @Nullable
-    @VisibleForTesting
     protected Multimap<String, String> parseQuery(URI uri) {
-        if (uri.getQuery() == null) {
-            return null;
-        }
-        List<Map.Entry<String, String>> nvps = URLEncodedUtils.parse(uri, StandardCharsets.UTF_8);
-        Multimap<String, String> mm = ArrayListMultimap.create();
-        nvps.forEach(nvp -> {
-            mm.put(nvp.getKey().toLowerCase(), nvp.getValue());
-        });
-        return mm;
+        return ParsedRequest.parseQuery(uri);
     }
 
     public HttpRespondable parseResponse(E entry) throws IOException {
