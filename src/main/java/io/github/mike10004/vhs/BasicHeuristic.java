@@ -1,93 +1,25 @@
 package io.github.mike10004.vhs;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
-import com.google.common.collect.Ordering;
 import com.google.common.io.ByteSource;
-import edu.umass.cs.benchlab.har.HarEntry;
 import fi.iki.elonen.NanoHTTPD;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class BasicHeuristic implements Heuristic {
-    private final ImmutableList<ParsedEntry> entries;
 
-    BasicHeuristic(Collection<ParsedEntry> entries) {
-        this.entries = ImmutableList.copyOf(entries);
-    }
-
-    static HeuristicFactory factory() {
-        return new Factory();
-    }
-
-    private static class Factory implements HeuristicFactory {
-
-        @Override
-        public Heuristic createHeuristic(List<HarEntry> entries) {
-            return fromHarEntries(entries);
-        }
-
-        private static final Logger log = LoggerFactory.getLogger(BasicHeuristic.class.getName() + "$Factory");
-
-        public static Heuristic fromHarEntries(List<HarEntry> entries) {
-            log.trace("constructing heuristic from {} har entries", entries.size());
-            return new BasicHeuristic(entries.stream()
-                    .map(harEntry -> {
-                        return new ParsedEntry(harEntry, ParsedRequest.create(harEntry.getRequest()));
-                    }).collect(ImmutableList.toImmutableList()));
-        }
-
-    }
-
-    static class ParsedEntry {
-        public final HarEntry harEntry;
-        public final ParsedRequest parsedEntry;
-
-        ParsedEntry(HarEntry harEntry, ParsedRequest parsedEntry) {
-            this.harEntry = Objects.requireNonNull(harEntry);
-            this.parsedEntry = Objects.requireNonNull(parsedEntry);
-        }
-
-        public HarEntry getHarEntry() {
-            return harEntry;
-        }
-    }
-
-    @Override
-    @Nullable
-    public HarEntry findTopEntry(ParsedRequest request) {
-        AtomicInteger topRating = new AtomicInteger(THRESHOLD_EXCLUSIVE);
-        @Nullable HarEntry topEntry = entries.stream()
-                .max(Ordering.<Integer>natural().onResultOf(entry -> {
-                    int rating = rate(Objects.requireNonNull(entry).parsedEntry, request);
-                    if (rating > THRESHOLD_EXCLUSIVE) {
-                        topRating.set(rating);
-                    }
-                    return rating;
-                }))
-                .map(ParsedEntry::getHarEntry)
-                .orElse(null);
-        if (topRating.get() > THRESHOLD_EXCLUSIVE) {
-            return topEntry;
-        }
-        return null;
-    }
+    public static final int DEFAULT_THRESHOLD_EXCLUSIVE = 0;
 
     private static final int INCREMENT = 100;
-    private static final int THRESHOLD_EXCLUSIVE = 0;
     private static final int HALF_INCREMENT = INCREMENT / 2;
 
+    @Override
     public int rate(ParsedRequest entryRequest, ParsedRequest request) {
         // String name;
         URI requestUrl = request.url;

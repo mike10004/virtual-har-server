@@ -5,12 +5,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
+import com.google.common.io.Resources;
 import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import io.github.mike10004.nanochamp.server.NanoControl;
 import io.github.mike10004.nanochamp.server.NanoResponse;
 import io.github.mike10004.nanochamp.server.NanoServer;
@@ -35,7 +40,10 @@ import java.net.URI;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,18 +54,36 @@ class ReplayingRequestHandlerTest {
 
     final static ImmutableList<EntrySpec> specs = ImmutableList.of(
             new EntrySpec(RequestSpec.get(URI.create("http://example.com/one")), NanoResponse.status(200).plainTextUtf8("one")),
-            new EntrySpec(RequestSpec.get(URI.create("http://example.com/two")), NanoResponse.status(200).plainTextUtf8("two"))
+            new EntrySpec(RequestSpec.get(URI.create("http://example.com/two")), NanoResponse.status(200).plainTextUtf8("two")),
+            new EntrySpec(RequestSpec.get(URI.create("http://example.com/three.jpg")), NanoResponse.status(200).jpeg(loadResource("/cat.jpg")))
     );
+
+    @SuppressWarnings("SameParameterValue")
+    private static byte[] loadResource(String resourcePath) {
+        try {
+            return Resources.toByteArray(ReplayingRequestHandlerTest.class.getResource(resourcePath));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void dumpHar(File harFile) throws IOException {
+        try (Reader reader = Files.asCharSource(harFile, UTF_8).openStream()) {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            JsonElement json = (new JsonParser().parse(reader));
+            abbreviate(json);
+            gson.toJson(json, System.out);
+        }
+        System.out.println();
+    }
 
     @Test
     void serve() throws Exception {
         File harFile = new File(getClass().getResource("/replay-test-1.har").toURI());
-        try (Reader reader = Files.asCharSource(harFile, UTF_8).openStream()) {
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            gson.toJson(new JsonParser().parse(reader), System.out);
-        }
-        System.out.println();
-        Heuristic heuristic = BasicHeuristic.factory().createHeuristic(harFile);
+        dumpHar(harFile);
+        List<de.sstoehr.harreader.model.HarEntry> entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
+        RequestParser<de.sstoehr.harreader.model.HarEntry> parser = new RequestParser<>(new SstoehrHarBridge());
+        EntryMatcher heuristic = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE).createEntryMatcher(entries, parser);
         List<RequestSpec> requestsToMake = specs.stream().map(s -> s.request).collect(Collectors.toList());
         requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.createDefault());
         int NOT_FOUND_CODE = 404;
@@ -116,4 +142,36 @@ class ReplayingRequestHandlerTest {
         byte[] bytes = EntityUtils.toByteArray(entity);
         return ByteSource.wrap(bytes); // for debugging, so we can look at the bytes here
     }
+    private static JsonPrimitive abbreviatePrimitive(JsonPrimitive primitive) {
+        if (primitive.isString()) {
+            return new JsonPrimitive(StringUtils.abbreviateMiddle(primitive.getAsString(), "...", 64));
+        } else {
+            return primitive;
+        }
+    }
+
+    private static void abbreviate(JsonElement element) {
+        if (element.isJsonObject()) {
+            JsonObject object = element.getAsJsonObject();
+            Set<Entry<String, JsonElement>> entries = new HashSet<>(object.entrySet());
+            for (Entry<String, JsonElement> entry : entries) {
+                if (entry.getValue().isJsonPrimitive()) {
+                    object.add(entry.getKey(), abbreviatePrimitive(entry.getValue().getAsJsonPrimitive()));
+                } else {
+                    abbreviate(entry.getValue());
+                }
+            }
+        }
+        if (element.isJsonArray()) {
+            JsonArray object = element.getAsJsonArray();
+            for (int i = 0; i < object.size(); i++) {
+                if (object.get(i).isJsonPrimitive()) {
+                    object.set(i, abbreviatePrimitive(object.get(i).getAsJsonPrimitive()));
+                } else {
+                    abbreviate(object.get(i));
+                }
+            }
+        }
+    }
+
 }

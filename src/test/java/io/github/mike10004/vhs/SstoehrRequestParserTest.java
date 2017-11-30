@@ -1,0 +1,32 @@
+package io.github.mike10004.vhs;
+
+import de.sstoehr.harreader.model.HarEntry;
+import de.sstoehr.harreader.model.HarHeader;
+import de.sstoehr.harreader.model.HarRequest;
+import de.sstoehr.harreader.model.HttpMethod;
+
+class SstoehrRequestParserTest extends RequestParserTestBase<HarEntry> {
+
+    @Override
+    protected RequestParser<HarEntry> createParser() {
+        return new RequestParser<>(new SstoehrHarBridge());
+    }
+
+    @SuppressWarnings("Duplicates")
+    @Override
+    protected HarEntry createEntryWithRequest(String method, String urlStr, String... headers) {
+        HarRequest request = new HarRequest();
+        request.setMethod(HttpMethod.GET);
+        request.setUrl(urlStr);
+        for (int i = 0; i < headers.length; i += 2) {
+            HarHeader header = new HarHeader();
+            header.setName((headers[i]));
+            header.setValue(headers[i+1]);
+            request.getHeaders().add(header);
+        }
+        HarEntry entry = new HarEntry();
+        entry.setRequest(request);
+        return entry;
+    }
+
+}

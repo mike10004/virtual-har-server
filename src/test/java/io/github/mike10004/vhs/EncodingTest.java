@@ -7,7 +7,7 @@ import javax.annotation.Nullable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class HarsTest {
+class EncodingTest {
     @Test
     void isBase64Encoded() {
         ImmutableMap.<Base64TestCase, Boolean>builder()
@@ -17,7 +17,7 @@ class HarsTest {
                 .put(new Base64TestCase("text/plain", "abc", "base64", 3L), true)
                 .put(new Base64TestCase("application/octet-stream", "abc", null, null), true)
                 .build().forEach((testCase, expected) -> {
-            boolean actual = Hars.isBase64Encoded(testCase.contentType, testCase.text, testCase.encoding, testCase.size);
+            boolean actual = Encoding.isBase64Encoded(testCase.contentType, testCase.text, testCase.encoding, testCase.size);
             assertEquals(expected, actual, () -> "expected " + expected + " for " + testCase);
         });
     }

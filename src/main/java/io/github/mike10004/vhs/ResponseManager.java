@@ -1,31 +1,34 @@
 package io.github.mike10004.vhs;
 
 import com.google.common.net.MediaType;
-import edu.umass.cs.benchlab.har.HarContent;
-import edu.umass.cs.benchlab.har.HarResponse;
 import fi.iki.elonen.NanoHTTPD;
 import io.github.mike10004.nanochamp.server.NanoResponse;
+import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 public interface ResponseManager {
 
-    NanoHTTPD.Response toResponse(HarResponse harResponse);
+    NanoHTTPD.Response toResponse(HttpRespondable response);
 
     static ResponseManager createDefault() {
         return new ResponseManager() {
             @Override
-            public NanoHTTPD.Response toResponse(HarResponse harResponse) {
-                NanoResponse rb = NanoResponse.status(harResponse.getStatus());
-                harResponse.getHeaders().getHeaders().forEach(header -> {
-                    rb.header(header.getName(), header.getValue());
+            public NanoHTTPD.Response toResponse(HttpRespondable response) {
+                NanoResponse rb = NanoResponse.status(response.getStatus());
+                response.streamHeaders().forEach(header -> {
+                    rb.header(header.getKey(), header.getValue());
                 });
-                HarContent content = harResponse.getContent();
-                @Nullable byte[] body = Hars.translate(content);
-                if (body == null) {
-                    body = new byte[0];
+                ByteArrayOutputStream baos = new ByteArrayOutputStream(256); // TODO set size from Content-Length header if present
+                MediaType contentType;
+                try {
+                    contentType = response.writeBody(baos);
+                } catch (IOException e) {
+                    LoggerFactory.getLogger(ResponseManager.class).error("could not buffer HTTP response data", e);
+                    return NanoResponse.status(500).plainTextUtf8("Internal server error");
                 }
-                rb.content(MediaType.parse(content.getMimeType()), body);
+                rb.content(contentType, baos.toByteArray());
                 return rb.build();
             }
         };

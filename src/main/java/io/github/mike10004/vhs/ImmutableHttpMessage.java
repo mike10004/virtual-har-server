@@ -20,6 +20,7 @@ import java.util.Base64;
 import java.util.Base64.Decoder;
 import java.util.Collection;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -27,8 +28,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 @SuppressWarnings("unused")
 public class ImmutableHttpMessage {
-
-    public static final Charset DEFAULT_HTTP_CHARSET = StandardCharsets.ISO_8859_1;
 
     private final HttpContentSource dataSource;
     public final ImmutableMultimap<String, String> headers;
@@ -116,8 +115,8 @@ public class ImmutableHttpMessage {
             return new OriginalByteSource(byteSource);
         }
 
-        static HttpContentSource fromChars(CharSource charSource) {
-            return new OriginalCharSource(charSource);
+        static HttpContentSource fromChars(CharSource charSource, Charset charsetForEncoding) {
+            return new OriginalCharSource(charSource, charsetForEncoding);
         }
 
         static HttpContentSource fromBase64(String base64Data) {
@@ -126,6 +125,8 @@ public class ImmutableHttpMessage {
     }
 
     protected static final class OriginalByteSource implements HttpContentSource {
+
+        private static final Charset _DEFAULT_HTTP_CHARSET = StandardCharsets.ISO_8859_1;
 
         private final ByteSource byteSource;
 
@@ -136,10 +137,10 @@ public class ImmutableHttpMessage {
         @Override
         public CharSource asChars(ImmutableHttpMessage message) {
             @Nullable String contentType = message.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
-            if (Hars.isTextLike(contentType)) {
-                @Nullable Charset charset = Hars.parseCharset(contentType);
+            if (Encoding.isTextLike(contentType)) {
+                @Nullable Charset charset = Encoding.parseCharset(contentType);
                 if (charset == null) {
-                    charset = Hars.INTERNET_DEFAULT_CHARSET;
+                    charset = _DEFAULT_HTTP_CHARSET;
                 }
                 return byteSource.asCharSource(charset);
             }
@@ -168,9 +169,11 @@ public class ImmutableHttpMessage {
     protected static final class OriginalCharSource implements HttpContentSource {
 
         private final CharSource charSource;
+        private final Charset charsetForEncoding;
 
-        public OriginalCharSource(CharSource charSource) {
-            this.charSource = checkNotNull(charSource);
+        public OriginalCharSource(CharSource charSource, Charset charsetForEncoding) {
+            this.charSource = Objects.requireNonNull(charSource);
+            this.charsetForEncoding = Objects.requireNonNull(charsetForEncoding);
         }
 
         @Override
@@ -185,14 +188,7 @@ public class ImmutableHttpMessage {
 
         @Override
         public ByteSource asBytes(ImmutableHttpMessage message) {
-            MediaType contentType = message.getContentType();
-            final Charset charset;
-            if (contentType != null && contentType.charset().isPresent()) {
-                charset = contentType.charset().get();
-            } else {
-                charset = DEFAULT_HTTP_CHARSET;
-            }
-            return charSource.asByteSource(charset);
+            return charSource.asByteSource(charsetForEncoding);
         }
 
         @Override
@@ -201,6 +197,19 @@ public class ImmutableHttpMessage {
                     "nativelyText=" + isNativelyText() +
                     ",charSource.length=" + charSource.lengthIfKnown().orNull() +
                     '}';
+        }
+
+//        public static OriginalCharSource create(CharSource charSource, ImmutableMultimap<String, String> headers) {
+//            MediaType contentType = message.getContentType();
+//        }
+
+        public static OriginalCharSource create(CharSource charSource, MediaType contentType) {
+            Objects.requireNonNull(contentType);
+            Charset charset = contentType.charset().orNull();
+            if (charset == null) {
+                throw new IllegalArgumentException("no charset specified");
+            }
+            return new OriginalCharSource(charSource, charset);
         }
     }
 
@@ -251,8 +260,8 @@ public class ImmutableHttpMessage {
             return (B) this;
         }
 
-        public B content(CharSource charSource) {
-            dataSource = new OriginalCharSource(charSource);
+        public B content(CharSource charSource, Charset charsetForEncoding) {
+            dataSource = new OriginalCharSource(charSource, charsetForEncoding);
             return (B) this;
         }
 
