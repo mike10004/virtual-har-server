@@ -10,9 +10,9 @@ import java.net.URI;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-abstract class RequestParserTestBase<E> {
+abstract class EntryParserTestBase<E> {
 
-    protected abstract RequestParser<E> createParser();
+    protected abstract EntryParser<E> createParser();
 
     protected abstract E createEntryWithRequest(String method, String url, String...headers);
 
@@ -30,7 +30,7 @@ abstract class RequestParserTestBase<E> {
 
     @Test
     void parseQuery() {
-        RequestParser<E> parser = createParser();
+        EntryParser<E> parser = createParser();
         Multimap<String, String> q = parser.parseQuery(URI.create("http://example.com/hello"));
         assertNull(q);
         q = parser.parseQuery(URI.create("http://example.com/hello?foo=bar"));

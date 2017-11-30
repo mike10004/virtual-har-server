@@ -14,11 +14,11 @@ import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
-public class RequestParser<E> {
+public class EntryParser<E> {
 
     private final HarBridge<E> bridge;
 
-    public RequestParser(HarBridge<E> bridge) {
+    public EntryParser(HarBridge<E> bridge) {
         this.bridge = requireNonNull(bridge);
     }
 

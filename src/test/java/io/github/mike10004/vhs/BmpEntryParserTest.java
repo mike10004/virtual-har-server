@@ -4,11 +4,11 @@ import net.lightbody.bmp.core.har.HarEntry;
 import net.lightbody.bmp.core.har.HarNameValuePair;
 import net.lightbody.bmp.core.har.HarRequest;
 
-class BmpRequestParserTest extends RequestParserTestBase<HarEntry> {
+class BmpEntryParserTest extends EntryParserTestBase<HarEntry> {
 
     @Override
-    protected RequestParser<HarEntry> createParser() {
-        return new RequestParser<>(new BmpHarBridge());
+    protected EntryParser<HarEntry> createParser() {
+        return new EntryParser<>(new BmpHarBridge());
     }
 
     @SuppressWarnings("Duplicates")

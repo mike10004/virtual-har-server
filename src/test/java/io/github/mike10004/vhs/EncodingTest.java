@@ -3,8 +3,6 @@ package io.github.mike10004.vhs;
 import com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Test;
 
-import javax.annotation.Nullable;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class EncodingTest {
@@ -17,7 +15,7 @@ class EncodingTest {
                 .put(new Base64TestCase("text/plain", "abc", "base64", 3L), true)
                 .put(new Base64TestCase("application/octet-stream", "abc", null, null), true)
                 .build().forEach((testCase, expected) -> {
-            boolean actual = Encoding.isBase64Encoded(testCase.contentType, testCase.text, testCase.encoding, testCase.size);
+            boolean actual = Hars.isBase64Encoded(testCase.contentType, testCase.text, testCase.encoding, testCase.size);
             assertEquals(expected, actual, () -> "expected " + expected + " for " + testCase);
         });
     }

@@ -7,7 +7,7 @@ public class ParsedEntry {
     public final HttpRespondable response;
     public final ParsedRequest request;
 
-    ParsedEntry(HttpRespondable response, ParsedRequest request) {
+    public ParsedEntry(ParsedRequest request, HttpRespondable response) {
         this.response = Objects.requireNonNull(response);
         this.request = Objects.requireNonNull(request);
     }

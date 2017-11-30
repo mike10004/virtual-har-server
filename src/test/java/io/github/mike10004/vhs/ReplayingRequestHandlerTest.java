@@ -16,6 +16,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import de.sstoehr.harreader.model.HarEntry;
 import io.github.mike10004.nanochamp.server.NanoControl;
 import io.github.mike10004.nanochamp.server.NanoResponse;
 import io.github.mike10004.nanochamp.server.NanoServer;
@@ -82,10 +83,11 @@ class ReplayingRequestHandlerTest {
         File harFile = new File(getClass().getResource("/replay-test-1.har").toURI());
         dumpHar(harFile);
         List<de.sstoehr.harreader.model.HarEntry> entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
-        RequestParser<de.sstoehr.harreader.model.HarEntry> parser = new RequestParser<>(new SstoehrHarBridge());
+        EntryParser<HarEntry> parser = new EntryParser<>(new SstoehrHarBridge());
         EntryMatcher heuristic = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE).createEntryMatcher(entries, parser);
         List<RequestSpec> requestsToMake = specs.stream().map(s -> s.request).collect(Collectors.toList());
-        requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.createDefault());
+        requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));
+        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.identity());
         int NOT_FOUND_CODE = 404;
         NanoServer server = NanoServer.builder()
                 .session(requestHandler)

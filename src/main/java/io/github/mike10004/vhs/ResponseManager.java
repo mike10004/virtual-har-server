@@ -12,7 +12,12 @@ public interface ResponseManager {
 
     NanoHTTPD.Response toResponse(HttpRespondable response);
 
-    static ResponseManager createDefault() {
+    /**
+     * Creates a response manager that produces exactly the response specified by
+     * an {@link HttpRespondable} instance.
+     * @return a non-transforming instance
+     */
+    static ResponseManager identity() {
         return new ResponseManager() {
             @Override
             public NanoHTTPD.Response toResponse(HttpRespondable response) {

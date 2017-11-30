@@ -1,6 +1,5 @@
 package io.github.mike10004.vhs;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.MediaType;
 import org.apache.commons.lang3.StringUtils;
@@ -14,43 +13,6 @@ import java.util.Set;
 public class Encoding {
 
     private static final Logger log = LoggerFactory.getLogger(Hars.class);
-
-    private static final CharMatcher BASE_64_ALPHABET = CharMatcher.inRange('A', 'Z')
-            .or(CharMatcher.inRange('a', 'z'))
-            .or(CharMatcher.inRange('0', '9'))
-            .or(CharMatcher.anyOf("/+="));
-
-    static boolean isAllBase64Alphabet(String text) {
-        return BASE_64_ALPHABET.matchesAllOf(text);
-    }
-
-    static boolean isBase64Encoded(String contentType, String text, @Nullable String encoding, @Nullable Long size) {
-        if (!isTextLike(contentType)) {
-            return true;
-        }
-        if ("base64".equalsIgnoreCase(encoding)) {
-            return true;
-        }
-        if (text.length() == 0) {
-            return true; // because it won't matter, nothing will be decoded
-        }
-        if (!isAllBase64Alphabet(text)) {
-            return false;
-        }
-        if (size != null) {
-            /*
-             * There are cases where the text is not base64-encoded and the content length
-             * in bytes is greater than the text length, because some text characters encode
-             * as more than one byte. But if the text length is greater than the reported byte
-             * length, it's either an incorrectly-reported length value or malformed text, and
-             * in either case we assume it's base64-encoding.
-             */
-            if (text.length() > size) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     @Nullable
     public static Charset parseCharset(@Nullable String contentType) {

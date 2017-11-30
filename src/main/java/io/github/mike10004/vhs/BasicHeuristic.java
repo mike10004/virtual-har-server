@@ -16,8 +16,18 @@ public class BasicHeuristic implements Heuristic {
 
     public static final int DEFAULT_THRESHOLD_EXCLUSIVE = 0;
 
-    private static final int INCREMENT = 100;
-    private static final int HALF_INCREMENT = INCREMENT / 2;
+    private static final int DEFAULT_INCREMENT = 100;
+    private final int increment;
+    private final int halfIncrement;
+
+    public BasicHeuristic() {
+        this(DEFAULT_INCREMENT);
+    }
+
+    public BasicHeuristic(int increment) {
+        this.increment = increment;
+        this.halfIncrement = this.increment / 2;
+    }
 
     @Override
     public int rate(ParsedRequest entryRequest, ParsedRequest request) {
@@ -38,22 +48,22 @@ public class BasicHeuristic implements Heuristic {
         if (!entryRequest.url.getPath().equals(requestUrl.getPath())) {
             return 0;
         }
-        int points = INCREMENT; // One point for matching above requirements
+        int points = increment; // One point for matching above requirements
 
         // each query
         @Nullable Multimap<String, String> entryQuery = entryRequest.query;
         if (entryQuery != null && requestQuery != null) {
             for (String name : requestQuery.keySet()) {
                 if (!entryQuery.containsKey(name)) {
-                    points -= HALF_INCREMENT;
+                    points -= halfIncrement;
                 } else {
-                    points += stripProtocol(entryQuery.get(name)).equals(stripProtocol(requestQuery.get(name))) ? INCREMENT : 0;
+                    points += stripProtocol(entryQuery.get(name)).equals(stripProtocol(requestQuery.get(name))) ? increment : 0;
                 }
             }
 
             for (String name : entryQuery.keySet()) {
                 if (!requestQuery.containsKey(name)) {
-                    points -= HALF_INCREMENT;
+                    points -= halfIncrement;
                 }
             }
         }
@@ -62,20 +72,20 @@ public class BasicHeuristic implements Heuristic {
         Multimap<String, String> entryHeaders = entryRequest.indexedHeaders;
         for (String name : requestHeaders.keySet()) {
             if (entryHeaders.containsKey(name)) {
-                points += stripProtocol(entryHeaders.get(name)).equals(stripProtocol(requestHeaders.get(name))) ? INCREMENT : 0;
+                points += stripProtocol(entryHeaders.get(name)).equals(stripProtocol(requestHeaders.get(name))) ? increment : 0;
             }
             // TODO handle missing headers and adjust score appropriately
         }
 
         if (request.method == NanoHTTPD.Method.POST || request.method == NanoHTTPD.Method.PUT) {
             if (!request.isBodyPresent() && !entryRequest.isBodyPresent()) {
-                points += HALF_INCREMENT;
+                points += halfIncrement;
             } else if (request.isBodyPresent() && entryRequest.isBodyPresent()) {
                 ByteSource bs1 = bodyToByteSource(request);
                 ByteSource bs2 = bodyToByteSource(entryRequest);
                 try {
                     if (bs1.contentEquals(bs2)) {
-                        points += INCREMENT;
+                        points += increment;
                     }
                 } catch (IOException ignore) {
                 }

@@ -12,15 +12,14 @@ import java.io.IOException;
 public class ReplayingRequestHandler implements io.github.mike10004.nanochamp.server.NanoServer.RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ReplayingRequestHandler.class);
+    private static final EntryParser<IHTTPSession> nanoParser = new EntryParser<>(new NanoBridge());
 
     private final EntryMatcher heuristic;
     private final ResponseManager responseManager;
-    private final RequestParser<NanoHTTPD.IHTTPSession> nanoParser;
 
     public ReplayingRequestHandler(EntryMatcher heuristic, ResponseManager responseManager) {
         this.heuristic = heuristic;
         this.responseManager = responseManager;
-        nanoParser = new RequestParser<>(new NanoBridge());
     }
 
     @Nullable
@@ -41,6 +40,7 @@ public class ReplayingRequestHandler implements io.github.mike10004.nanochamp.se
         return null;
     }
 
+    @SuppressWarnings("unused")
     @Nullable
     protected Response requestParsingFailed(IHTTPSession session) {
         return null;

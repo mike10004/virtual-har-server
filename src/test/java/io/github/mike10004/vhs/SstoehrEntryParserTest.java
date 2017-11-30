@@ -5,11 +5,11 @@ import de.sstoehr.harreader.model.HarHeader;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HttpMethod;
 
-class SstoehrRequestParserTest extends RequestParserTestBase<HarEntry> {
+class SstoehrEntryParserTest extends EntryParserTestBase<HarEntry> {
 
     @Override
-    protected RequestParser<HarEntry> createParser() {
-        return new RequestParser<>(new SstoehrHarBridge());
+    protected EntryParser<HarEntry> createParser() {
+        return new EntryParser<>(new SstoehrHarBridge());
     }
 
     @SuppressWarnings("Duplicates")

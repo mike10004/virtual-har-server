@@ -43,13 +43,13 @@ public class HeuristicEntryMatcher implements EntryMatcher {
         }
 
         @Override
-        public <E> EntryMatcher createEntryMatcher(List<E> entries, RequestParser<E> requestParser) throws IOException {
+        public <E> EntryMatcher createEntryMatcher(List<E> entries, EntryParser<E> requestParser) throws IOException {
             log.trace("constructing heuristic from {} har entries", entries.size());
             List<ParsedEntry> parsedEntries = new ArrayList<>(entries.size());
             for (E entry : entries) {
                 ParsedRequest request = requestParser.parseRequest(entry);
                 HttpRespondable respondable = requestParser.parseResponse(entry);
-                ParsedEntry parsedEntry = new ParsedEntry(respondable, request);
+                ParsedEntry parsedEntry = new ParsedEntry(request, respondable);
                 parsedEntries.add(parsedEntry);
             }
             return new HeuristicEntryMatcher(heuristic, thresholdExclusive, parsedEntries);

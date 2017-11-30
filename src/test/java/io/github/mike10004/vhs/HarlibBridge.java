@@ -59,7 +59,7 @@ public class HarlibBridge {
             //noinspection ResultOfMethodCallIgnored
             Ints.checkedCast(length); // argument check
         }
-        boolean base64 = Encoding.isBase64Encoded(contentType, text, encoding, length);
+        boolean base64 = Hars.isBase64Encoded(contentType, text, encoding, length);
         if (base64) {
             return Base64.getDecoder().decode(text);
         } else {
