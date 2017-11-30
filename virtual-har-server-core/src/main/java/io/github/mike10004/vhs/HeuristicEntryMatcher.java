@@ -26,7 +26,7 @@ public class HeuristicEntryMatcher implements EntryMatcher {
         this.heuristic = requireNonNull(heuristic);
     }
 
-    static EntryMatcherFactory factory(Heuristic heuristic, int thresholdExclusive) {
+    public static EntryMatcherFactory factory(Heuristic heuristic, int thresholdExclusive) {
         return new Factory(heuristic, thresholdExclusive);
     }
 

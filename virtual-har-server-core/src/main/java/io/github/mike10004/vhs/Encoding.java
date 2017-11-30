@@ -2,7 +2,6 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.MediaType;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,7 @@ public class Encoding {
         try {
             mime = MediaType.parse(contentType).withoutParameters();
         } catch (IllegalArgumentException e) {
-            log.debug("failed to parse mime type from {}", StringUtils.abbreviate(contentType, 128));
+            log.debug("failed to parse mime type from {}", contentType);
         }
         if (mime != null) {
             if (mime.is(MediaType.ANY_TEXT_TYPE)) {

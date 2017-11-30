@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import io.github.mike10004.nanochamp.server.NanoControl;
 import io.github.mike10004.nanochamp.server.NanoControl.NanoHttpdImpl;

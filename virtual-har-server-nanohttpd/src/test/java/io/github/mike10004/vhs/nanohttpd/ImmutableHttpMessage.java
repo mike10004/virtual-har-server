@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ArrayListMultimap;
@@ -8,6 +8,7 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
+import io.github.mike10004.vhs.Encoding;
 
 import javax.annotation.Nullable;
 import java.io.IOException;

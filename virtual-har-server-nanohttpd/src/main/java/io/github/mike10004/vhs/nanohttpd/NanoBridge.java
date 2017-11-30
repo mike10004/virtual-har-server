@@ -1,9 +1,10 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.io.ByteStreams;
 import com.google.common.net.MediaType;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.vhs.HarBridge;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
@@ -12,7 +13,7 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.stream.Stream;
 
-public class NanoBridge implements HarBridge<NanoHTTPD.IHTTPSession> {
+public class NanoBridge implements HarBridge<IHTTPSession> {
     @Override
     public String getRequestMethod(IHTTPSession entry) {
         return entry.getMethod().name();

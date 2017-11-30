@@ -1,8 +1,9 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.net.MediaType;
 import fi.iki.elonen.NanoHTTPD;
 import io.github.mike10004.nanochamp.server.NanoResponse;
+import io.github.mike10004.vhs.HttpRespondable;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;

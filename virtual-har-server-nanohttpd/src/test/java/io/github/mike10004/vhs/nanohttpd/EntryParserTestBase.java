@@ -1,8 +1,11 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
-import fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.EntryParser;
+import io.github.mike10004.vhs.HttpMethod;
+import io.github.mike10004.vhs.ParsedRequest;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -21,21 +24,11 @@ abstract class EntryParserTestBase<E> {
         String urlStr = "https://www.example.com/hello";
         E entry = createEntryWithRequest("GET", urlStr, "X-Something", "foo", "X-Something-Else", "bar");
         ParsedRequest parsed = createParser().parseRequest(entry);
-        assertEquals(NanoHTTPD.Method.GET, parsed.method, "method");
+        Assertions.assertEquals(HttpMethod.GET, parsed.method, "method");
         assertEquals(URI.create(urlStr), parsed.url, "url");
         assertEquals(null, parsed.query, "query");
         assertEquals(2, parsed.indexedHeaders.size());
         assertEquals("foo", parsed.indexedHeaders.get("x-something").iterator().next(), "header value");
     }
 
-    @Test
-    void parseQuery() {
-        EntryParser<E> parser = createParser();
-        Multimap<String, String> q = parser.parseQuery(URI.create("http://example.com/hello"));
-        assertNull(q);
-        q = parser.parseQuery(URI.create("http://example.com/hello?foo=bar"));
-        assertEquals(ImmutableMultimap.of("foo", "bar"), q);
-        q = parser.parseQuery(URI.create("http://example.com/hello?"));
-        assertEquals(ImmutableMultimap.of(), q);
-    }
 }

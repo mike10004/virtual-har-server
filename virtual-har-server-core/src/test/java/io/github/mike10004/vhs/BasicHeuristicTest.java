@@ -1,11 +1,7 @@
 package io.github.mike10004.vhs;
 
-import com.google.common.collect.ImmutableMultimap;
-import fi.iki.elonen.NanoHTTPD;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-
-import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

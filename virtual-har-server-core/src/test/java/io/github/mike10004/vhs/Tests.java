@@ -2,7 +2,6 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.net.MediaType;
-import fi.iki.elonen.NanoHTTPD;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -14,7 +13,7 @@ public class Tests {
 
     public static ParsedRequest createRequest(String method, String url) {
         URI uri = URI.create(url);
-        return new ParsedRequest.MemoryRequest(NanoHTTPD.Method.valueOf(method), uri, ParsedRequest.parseQuery(uri), ImmutableMultimap.of(), null);
+        return new ParsedRequest.MemoryRequest(HttpMethod.valueOf(method), uri, EntryParser.Defaults.parseQuery(uri), ImmutableMultimap.of(), null);
     }
 
     public static String readAsString(HttpRespondable response) throws IOException {

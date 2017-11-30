@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 import com.google.common.io.ByteSource;
-import fi.iki.elonen.NanoHTTPD;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -77,7 +76,7 @@ public class BasicHeuristic implements Heuristic {
             // TODO handle missing headers and adjust score appropriately
         }
 
-        if (request.method == NanoHTTPD.Method.POST || request.method == NanoHTTPD.Method.PUT) {
+        if (request.method == HttpMethod.POST || request.method == HttpMethod.PUT) {
             if (!request.isBodyPresent() && !entryRequest.isBodyPresent()) {
                 points += halfIncrement;
             } else if (request.isBodyPresent() && entryRequest.isBodyPresent()) {

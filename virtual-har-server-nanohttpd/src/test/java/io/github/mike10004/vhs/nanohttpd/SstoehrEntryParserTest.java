@@ -1,9 +1,10 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import de.sstoehr.harreader.model.HarEntry;
 import de.sstoehr.harreader.model.HarHeader;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HttpMethod;
+import io.github.mike10004.vhs.EntryParser;
 
 class SstoehrEntryParserTest extends EntryParserTestBase<HarEntry> {
 

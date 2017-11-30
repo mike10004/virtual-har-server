@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Uninterruptibles;

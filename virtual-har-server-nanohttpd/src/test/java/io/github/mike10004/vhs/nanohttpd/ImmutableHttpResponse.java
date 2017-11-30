@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 public class ImmutableHttpResponse extends ImmutableHttpMessage {
 

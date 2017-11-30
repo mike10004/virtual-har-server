@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
@@ -20,7 +20,11 @@ import de.sstoehr.harreader.model.HarEntry;
 import io.github.mike10004.nanochamp.server.NanoControl;
 import io.github.mike10004.nanochamp.server.NanoResponse;
 import io.github.mike10004.nanochamp.server.NanoServer;
-import io.github.mike10004.vhs.HarMaker.EntrySpec;
+import io.github.mike10004.vhs.BasicHeuristic;
+import io.github.mike10004.vhs.EntryMatcher;
+import io.github.mike10004.vhs.EntryParser;
+import io.github.mike10004.vhs.HeuristicEntryMatcher;
+import io.github.mike10004.vhs.nanohttpd.HarMaker.EntrySpec;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -31,6 +35,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import javax.annotation.Nullable;
@@ -119,9 +124,9 @@ class ReplayingRequestHandlerTest {
         interactions.forEach((request, response) -> {
             @Nullable EntrySpec entry = findEntrySpec(specs, request);
             if (entry != null) {
-                assertEquals(entry.response.getStatus().getRequestStatus(), response.status, "response.status");
+                Assertions.assertEquals(entry.response.getStatus().getRequestStatus(), response.status, "response.status");
             } else {
-                assertEquals(NOT_FOUND_CODE, response.status, "response.status for unspec'd request");
+                Assertions.assertEquals(NOT_FOUND_CODE, response.status, "response.status for unspec'd request");
             }
         });
     }
