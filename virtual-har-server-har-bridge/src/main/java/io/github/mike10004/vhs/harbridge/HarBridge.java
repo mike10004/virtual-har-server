@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.harbridge;
 
 import com.google.common.net.MediaType;
 

@@ -7,7 +7,7 @@ import de.sstoehr.harreader.model.HarPostData;
 import de.sstoehr.harreader.model.HarPostDataParam;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
-import io.github.mike10004.vhs.HarBridge;
+import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.Hars;
 
 import javax.annotation.Nullable;

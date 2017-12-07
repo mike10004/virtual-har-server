@@ -5,6 +5,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.ParsedRequest.MemoryRequest;
+import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
 
 import javax.annotation.Nullable;
