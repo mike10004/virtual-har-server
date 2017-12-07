@@ -1,12 +1,12 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.harbridge;
 
 import com.google.common.collect.ImmutableMap;
-import io.github.mike10004.vhs.harbridge.Hars;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class EncodingTest {
+class HarsTest {
+
     @Test
     void isBase64Encoded() {
         ImmutableMap.<Base64TestCase, Boolean>builder()
@@ -42,5 +42,4 @@ class EncodingTest {
                     '}';
         }
     }
-
 }

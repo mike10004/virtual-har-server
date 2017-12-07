@@ -34,7 +34,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
      * Creates a lowercase-keyed multimap from a list of headers.
      */
     protected Multimap<String, String> indexHeaders(Stream<? extends Entry<String, String>> entryHeaders) {
-        return Defaults.indexHeaders(entryHeaders);
+        return HttpRequests.indexHeaders(entryHeaders);
     }
 
     /**
@@ -44,7 +44,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
      */
     @Nullable
     public Multimap<String, String> parseQuery(URI uri) {
-        return Defaults.parseQuery(uri);
+        return HttpRequests.parseQuery(uri);
     }
 
     public HttpRespondable parseResponse(E entry) throws IOException {

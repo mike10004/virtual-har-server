@@ -19,6 +19,7 @@ import java.util.Map.Entry;
 import java.util.stream.Stream;
 
 public class SstoehrHarBridge implements HarBridge<HarEntry> {
+
     protected HarRequest getRequest(HarEntry entry) {
         return checkNotNull(entry.getRequest(), "request");
     }

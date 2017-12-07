@@ -13,7 +13,7 @@ public class Tests {
 
     public static ParsedRequest createRequest(String method, String url) {
         URI uri = URI.create(url);
-        return new ParsedRequest.MemoryRequest(HttpMethod.valueOf(method), uri, EntryParser.Defaults.parseQuery(uri), ImmutableMultimap.of(), null);
+        return new ParsedRequest.MemoryRequest(HttpMethod.valueOf(method), uri, HttpRequests.parseQuery(uri), ImmutableMultimap.of(), null);
     }
 
     public static String readAsString(HttpRespondable response) throws IOException {

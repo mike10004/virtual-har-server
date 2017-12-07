@@ -8,15 +8,15 @@ import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class EntryParserTest {
+class HttpRequestsTest {
 
     @Test
     void parseQuery() {
-        Multimap<String, String> q = EntryParser.Defaults.parseQuery(URI.create("http://example.com/hello"));
+        Multimap<String, String> q = HttpRequests.parseQuery(URI.create("http://example.com/hello"));
         assertNull(q);
-        q = EntryParser.Defaults.parseQuery(URI.create("http://example.com/hello?foo=bar"));
+        q = HttpRequests.parseQuery(URI.create("http://example.com/hello?foo=bar"));
         assertEquals(ImmutableMultimap.of("foo", "bar"), q);
-        q = EntryParser.Defaults.parseQuery(URI.create("http://example.com/hello?"));
+        q = HttpRequests.parseQuery(URI.create("http://example.com/hello?"));
         assertEquals(ImmutableMultimap.of(), q);
     }
 
