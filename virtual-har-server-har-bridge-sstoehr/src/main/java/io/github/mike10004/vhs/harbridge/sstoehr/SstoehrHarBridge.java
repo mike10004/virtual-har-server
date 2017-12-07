@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.harbridge.sstoehr;
 
 import com.google.common.net.MediaType;
 import de.sstoehr.harreader.model.HarContent;
@@ -8,7 +8,7 @@ import de.sstoehr.harreader.model.HarPostDataParam;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
 import io.github.mike10004.vhs.harbridge.HarBridge;
-import io.github.mike10004.vhs.Hars;
+import io.github.mike10004.vhs.harbridge.Hars;
 
 import javax.annotation.Nullable;
 import java.io.IOException;

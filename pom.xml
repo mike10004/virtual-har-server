@@ -12,6 +12,7 @@
         <module>virtual-har-server-core</module>
         <module>virtual-har-server-nanohttpd</module>
         <module>virtual-har-server-har-bridge</module>
+        <module>virtual-har-server-har-bridge-sstoehr</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

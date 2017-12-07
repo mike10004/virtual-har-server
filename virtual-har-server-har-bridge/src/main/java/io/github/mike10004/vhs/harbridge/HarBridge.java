@@ -3,14 +3,12 @@ package io.github.mike10004.vhs.harbridge;
 import com.google.common.net.MediaType;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- *
+ * Interface that defines the methods needed to support a HAR library.
  * @param <E> HAR entry class
  */
 public interface HarBridge<E> {

@@ -1,6 +1,7 @@
 package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableMap;
+import io.github.mike10004.vhs.harbridge.Hars;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

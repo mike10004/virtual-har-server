@@ -8,7 +8,6 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import io.github.mike10004.vhs.Encoding;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -127,8 +126,6 @@ public class ImmutableHttpMessage {
 
     protected static final class OriginalByteSource implements HttpContentSource {
 
-        private static final Charset _DEFAULT_HTTP_CHARSET = StandardCharsets.ISO_8859_1;
-
         private final ByteSource byteSource;
 
         public OriginalByteSource(ByteSource byteSource) {
@@ -138,14 +135,13 @@ public class ImmutableHttpMessage {
         @Override
         public CharSource asChars(ImmutableHttpMessage message) {
             @Nullable String contentType = message.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
-            if (Encoding.isTextLike(contentType)) {
-                @Nullable Charset charset = Encoding.parseCharset(contentType);
-                if (charset == null) {
-                    charset = _DEFAULT_HTTP_CHARSET;
-                }
+            if (contentType != null) {
+                MediaType mediaType = MediaType.parse(contentType);
+                Charset charset = mediaType.charset().orNull();
+                Objects.requireNonNull(charset, () -> String.format("charset not defined by content type %s", contentType));
                 return byteSource.asCharSource(charset);
             }
-            return encodeToBase64(byteSource);
+            throw new UnsupportedOperationException("cannot decode bytes that do not have explicit content type with charset defined; this content type is null");
         }
 
         @Override

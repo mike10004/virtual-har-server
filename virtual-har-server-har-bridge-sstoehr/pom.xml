@@ -9,16 +9,17 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>virtual-har-server-har-bridge</artifactId>
+    <artifactId>virtual-har-server-har-bridge-sstoehr</artifactId>
 
     <dependencies>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>virtual-har-server-har-bridge</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
+            <groupId>de.sstoehr</groupId>
+            <artifactId>har-reader</artifactId>
         </dependency>
     </dependencies>
 </project>

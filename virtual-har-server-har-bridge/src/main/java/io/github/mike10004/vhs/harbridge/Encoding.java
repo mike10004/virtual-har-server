@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.harbridge;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.MediaType;
@@ -9,9 +9,9 @@ import javax.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.util.Set;
 
-public class Encoding {
+class Encoding {
 
-    private static final Logger log = LoggerFactory.getLogger(Hars.class);
+    private static final Logger log = LoggerFactory.getLogger(Encoding.class);
 
     @Nullable
     public static Charset parseCharset(@Nullable String contentType) {

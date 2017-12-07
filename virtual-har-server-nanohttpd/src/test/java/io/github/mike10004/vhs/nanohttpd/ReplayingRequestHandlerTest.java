@@ -24,6 +24,7 @@ import io.github.mike10004.vhs.BasicHeuristic;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HeuristicEntryMatcher;
+import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import io.github.mike10004.vhs.nanohttpd.HarMaker.EntrySpec;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
