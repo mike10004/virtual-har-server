@@ -33,7 +33,7 @@ public class Hars {
      * @param size the size field
      * @return true if the text represents base-64-encoded data
      */
-    static boolean isBase64Encoded(String contentType, String text, @Nullable String encoding, @Nullable Long size) {
+    public static boolean isBase64Encoded(String contentType, String text, @Nullable String encoding, @Nullable Long size) {
         if (!Encoding.isTextLike(contentType)) {
             return true;
         }
@@ -88,9 +88,9 @@ public class Hars {
      * @return a byte array containing encoded
      */
     @Nullable
-    public static byte[] translate(String contentType, @Nullable String text, @Nullable Long length,
-                            @SuppressWarnings("SameParameterValue") @Nullable String encoding,
-                            @SuppressWarnings("unused") @Nullable String comment, MessageDirection direction) {
+    public static byte[] translateContent(String contentType, @Nullable String text, @Nullable Long length,
+                                          @SuppressWarnings("SameParameterValue") @Nullable String encoding,
+                                          @SuppressWarnings("unused") @Nullable String comment, MessageDirection direction) {
         if (text == null) {
             return null;
         }

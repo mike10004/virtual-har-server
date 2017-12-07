@@ -72,7 +72,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
             if (!params.isEmpty()) {
                 throw new UnsupportedOperationException("not yet implemented: parsing post data params");
             }
-            return Hars.translate(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment(), Hars.MessageDirection.REQUEST);
+            return Hars.translateContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment(), Hars.MessageDirection.REQUEST);
         }
         return null;
     }
@@ -81,7 +81,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     public byte[] getResponseBody(HarEntry entry) throws IOException {
         HarResponse rsp =getResponse(entry);
         HarContent content = checkNotNull(rsp.getContent(), "response.content");
-        return Hars.translate(content.getMimeType(), content.getText(), nullIfNegative(content.getSize()), content.getEncoding(), content.getComment(), Hars.MessageDirection.RESPONSE);
+        return Hars.translateContent(content.getMimeType(), content.getText(), nullIfNegative(content.getSize()), content.getEncoding(), content.getComment(), Hars.MessageDirection.RESPONSE);
     }
 
     @SuppressWarnings("Duplicates")

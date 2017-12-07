@@ -5,13 +5,14 @@ import de.sstoehr.harreader.model.HarHeader;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.EntryParser;
+import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 
 class SstoehrEntryParserTest extends EntryParserTestBase<HarEntry> {
 
     @Override
     protected EntryParser<HarEntry> createParser() {
-        return new EntryParser<>(new SstoehrHarBridge());
+        return new HarBridgeEntryParser<>(new SstoehrHarBridge());
     }
 
     @SuppressWarnings("Duplicates")

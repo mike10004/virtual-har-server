@@ -5,6 +5,7 @@ import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryParser;
+import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HttpRespondable;
 import io.github.mike10004.vhs.ParsedRequest;
 import org.slf4j.Logger;
@@ -16,7 +17,7 @@ import java.io.IOException;
 public class ReplayingRequestHandler implements io.github.mike10004.nanochamp.server.NanoServer.RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ReplayingRequestHandler.class);
-    private static final EntryParser<IHTTPSession> nanoParser = new EntryParser<>(new NanoBridge());
+    private static final EntryParser<IHTTPSession> nanoParser = new HarBridgeEntryParser<>(new NanoBridge());
 
     private final EntryMatcher heuristic;
     private final ResponseManager responseManager;

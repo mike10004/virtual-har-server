@@ -8,6 +8,7 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -47,8 +48,8 @@ public class ImmutableHttpMessage {
         return dataSource.asBytes(this);
     }
 
-    public CharSource getContentAsChars() {
-        return dataSource.asChars(this);
+    public CharSource getContentAsChars(Charset charsetIfNotSpecified) {
+        return dataSource.asChars(this, charsetIfNotSpecified);
     }
 
     protected static CharSource encodeToBase64(ByteSource byteSource) {
@@ -84,7 +85,7 @@ public class ImmutableHttpMessage {
     public interface HttpContentSource {
 
         boolean isNativelyText();
-        CharSource asChars(ImmutableHttpMessage message);
+        CharSource asChars(ImmutableHttpMessage message, Charset charsetIfNotSpecified);
         ByteSource asBytes(ImmutableHttpMessage message);
 
         static HttpContentSource empty() {
@@ -95,7 +96,7 @@ public class ImmutableHttpMessage {
                 }
 
                 @Override
-                public CharSource asChars(ImmutableHttpMessage message) {
+                public CharSource asChars(ImmutableHttpMessage message, Charset charsetIfNotSpecified) {
                     return CharSource.empty();
                 }
 
@@ -133,12 +134,15 @@ public class ImmutableHttpMessage {
         }
 
         @Override
-        public CharSource asChars(ImmutableHttpMessage message) {
+        public CharSource asChars(ImmutableHttpMessage message, Charset charsetIfNotSpecified) {
             @Nullable String contentType = message.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
             if (contentType != null) {
                 MediaType mediaType = MediaType.parse(contentType);
                 Charset charset = mediaType.charset().orNull();
-                Objects.requireNonNull(charset, () -> String.format("charset not defined by content type %s", contentType));
+                if (charset == null) {
+                    LoggerFactory.getLogger(OriginalByteSource.class).info("charset not specified by content type {}; falling back to {}", contentType, charsetIfNotSpecified);
+                    charset = Objects.requireNonNull(charsetIfNotSpecified, "fallback charset must be non-null");
+                }
                 return byteSource.asCharSource(charset);
             }
             throw new UnsupportedOperationException("cannot decode bytes that do not have explicit content type with charset defined; this content type is null");
@@ -179,7 +183,7 @@ public class ImmutableHttpMessage {
         }
 
         @Override
-        public CharSource asChars(ImmutableHttpMessage message) {
+        public CharSource asChars(ImmutableHttpMessage message, Charset charsetIfNotSpecified) {
             return charSource;
         }
 
@@ -195,10 +199,6 @@ public class ImmutableHttpMessage {
                     ",charSource.length=" + charSource.lengthIfKnown().orNull() +
                     '}';
         }
-
-//        public static OriginalCharSource create(CharSource charSource, ImmutableMultimap<String, String> headers) {
-//            MediaType contentType = message.getContentType();
-//        }
 
         public static OriginalCharSource create(CharSource charSource, MediaType contentType) {
             Objects.requireNonNull(contentType);

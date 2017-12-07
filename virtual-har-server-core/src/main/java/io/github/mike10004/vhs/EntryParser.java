@@ -3,9 +3,6 @@ package io.github.mike10004.vhs;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.net.MediaType;
-import io.github.mike10004.vhs.ParsedRequest.MemoryRequest;
-import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
 
 import javax.annotation.Nullable;
@@ -16,59 +13,35 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
 
-import static java.util.Objects.requireNonNull;
-
-public class EntryParser<E> {
-
-    private final HarBridge<E> bridge;
-
-    public EntryParser(HarBridge<E> bridge) {
-        this.bridge = requireNonNull(bridge);
-    }
-
-    public ParsedRequest parseRequest(E harEntry) throws IOException {
-        URI parsedUrl = URI.create(bridge.getRequestUrl(harEntry));
-        Multimap<String, String> query = parseQuery(parsedUrl);
-        Multimap<String, String> indexedHeaders = indexHeaders(bridge.getRequestHeaders(harEntry));
-        byte[] body = bridge.getRequestPostData(harEntry);
-        return new MemoryRequest(HttpMethod.valueOf(bridge.getRequestMethod(harEntry)), parsedUrl, query, indexedHeaders, body);
-    }
+/**
+ *
+ * @param <E> har entry type used by HAR library
+ */
+public interface EntryParser<E> {
 
     /**
-     * Creates a lowercase-keyed multimap from a list of headers.
+     * Parses the request present in a HAR entry.
+     * @param harEntry the HAR entry
+     * @return the parsed request
      */
-    protected Multimap<String, String> indexHeaders(Stream<? extends Entry<String, String>> entryHeaders) {
-        return Defaults.indexHeaders(entryHeaders);
-    }
+    ParsedRequest parseRequest(E harEntry) throws IOException;
 
     /**
-     * Creates a multimap from the parameters specified in a URI.
-     * @param uri the URI
-     * @return the multimap
+     * Parses the HTTP response present in a HAR entry.
+     * @param harEntry the HAR entry
+     * @return the parsed response
      */
-    @Nullable
-    public Multimap<String, String> parseQuery(URI uri) {
-        return Defaults.parseQuery(uri);
-    }
+    HttpRespondable parseResponse(E harEntry) throws IOException;
 
-    public HttpRespondable parseResponse(E entry) throws IOException {
-        int status = bridge.getResponseStatus(entry);
-        byte[] body = bridge.getResponseBody(entry);
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        bridge.getResponseHeaders(entry).forEach(header -> {
-            headers.put(header.getKey(), header.getValue());
-        });
-        MediaType contentType = bridge.getResponseContentType(entry);
-        return HttpRespondable.inMemory(status, headers, contentType, body);
-    }
+    class Defaults {
 
-    protected static class Defaults {
+        private Defaults() {}
 
         /**
          * Creates a lowercase-keyed multimap from a list of headers.
          */
         @VisibleForTesting
-        static Multimap<String, String> indexHeaders(Stream<? extends Entry<String, String>> entryHeaders) {
+        public static Multimap<String, String> indexHeaders(Stream<? extends Entry<String, String>> entryHeaders) {
             Multimap<String, String> headers = ArrayListMultimap.create();
             entryHeaders.forEach(header -> {
                 headers.put(header.getKey().toLowerCase(), header.getValue());
@@ -78,7 +51,7 @@ public class EntryParser<E> {
 
         @Nullable
         @VisibleForTesting
-        static Multimap<String, String> parseQuery(URI uri) {
+        public static Multimap<String, String> parseQuery(URI uri) {
             if (uri.getQuery() == null) {
                 return null;
             }
@@ -91,6 +64,5 @@ public class EntryParser<E> {
         }
 
     }
-
 
 }

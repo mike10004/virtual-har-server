@@ -23,6 +23,7 @@ import io.github.mike10004.nanochamp.server.NanoServer;
 import io.github.mike10004.vhs.BasicHeuristic;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryParser;
+import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import io.github.mike10004.vhs.nanohttpd.HarMaker.EntrySpec;
@@ -44,6 +45,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Base64;
 import java.util.Collection;
@@ -89,7 +92,7 @@ class ReplayingRequestHandlerTest {
         File harFile = new File(getClass().getResource("/replay-test-1.har").toURI());
         dumpHar(harFile);
         List<de.sstoehr.harreader.model.HarEntry> entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
-        EntryParser<HarEntry> parser = new EntryParser<>(new SstoehrHarBridge());
+        EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
         EntryMatcher heuristic = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE).createEntryMatcher(entries, parser);
         List<RequestSpec> requestsToMake = specs.stream().map(s -> s.request).collect(Collectors.toList());
         requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));
@@ -137,10 +140,12 @@ class ReplayingRequestHandlerTest {
         return entries.stream().filter(entry -> request == entry.request).findFirst().orElse(null);
     }
 
-    private String stringifyContent(ImmutableHttpResponse capturedResponse) throws IOException {
+    private static final Charset CHARSET_OF_RESPONSE_TEXT_IN_HAR = StandardCharsets.US_ASCII;
+
+    private static String stringifyContent(ImmutableHttpResponse capturedResponse) throws IOException {
         String ctype = capturedResponse.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
         if (ctype != null && MediaType.parse(ctype).is(MediaType.ANY_TEXT_TYPE)) {
-            return capturedResponse.getContentAsChars().read();
+            return capturedResponse.getContentAsChars(CHARSET_OF_RESPONSE_TEXT_IN_HAR).read();
         } else {
             return Base64.getEncoder().encodeToString(capturedResponse.getContentAsBytes().read());
         }
