@@ -39,7 +39,7 @@ package io.github.mike10004.vhs.lzw;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class Unpacker extends Lz {
+public class Unpacker implements LzConsts {
 
     private short ipbyte;
     private int currlen, barrel;
@@ -56,7 +56,7 @@ public class Unpacker extends Lz {
     // Constructors
     //=======================================================================
 
-    public Unpacker(boolean compmode, InputStream ifp) {
+    public Unpacker(InputStream ifp) {
         currlen = 0;
         barrel= 0;
         op_codeword = 0;
@@ -80,7 +80,7 @@ public class Unpacker extends Lz {
         do {
             // Gracefully fail if no more input bytes---codeword is
             // don't care. 
-            if ((ipbyte = getc(ip_file)) == -1) 
+            if ((ipbyte = Lz.getc(ip_file)) == -1)
                 return byte_count;
 
             // We successfully got a byte so increment the byte counter 

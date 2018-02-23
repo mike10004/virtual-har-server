@@ -30,31 +30,9 @@ package io.github.mike10004.vhs.lzw;
 
 public interface LzConsts {
 
-    //=======================================================================
-    // Common constant definitions common throughout the codec classes
-    //=======================================================================
-
-    // Note: all these declarations are 'static final' dy definition in an
-    // interface
-
-    boolean SUCCESS             = true;
-    boolean FAILURE             = false;
-
-    int NEWLINE                 = 0x0A;
-
     int BYTESIZE                = 8;
     int BYTEMASK                = 0xff;
     int BITSIZE                 = 1;
-    int NUMOF8BITBYTES          = 0x100;
-    int DEFAULTSTRSIZE          = 20;
-
-    int DEFAULTRECSIZE          = 0;
-
-    boolean EOR                 = true;
-    boolean NO_EOR              = false;
-
-    int RESCWNUM                = 8;
-    int FIRSTROOTCW             = 0x000;
     int FIRSTCW                 = 0x100;
     int NULLCW                  = 0xFFFF;
     int EOFFLUSH                = NULLCW;
@@ -65,14 +43,9 @@ public interface LzConsts {
 
     int DICTFULL                = (1 << MAXCWLEN);
     int NOMATCH                 = DICTFULL;
-    int MAXDICTSIZE             = DICTFULL;
 
     int CODEWORDMASK            = ((1 << MAXCWLEN) - 1);
 
     int NOERROR                 = 0;
-    int USER_ERROR              = 1;
-    int DECOMPRESSION_ERROR     = 2;
-    int PACKER_ERROR            = 3;
-    int UNPACKER_ERROR          = 4;
 
 }

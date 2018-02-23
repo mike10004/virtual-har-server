@@ -38,34 +38,24 @@ package io.github.mike10004.vhs.lzw;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class Comp extends Lz {
+public class Comp implements LzConsts {
 
-    private int match_length_so_far;
-    private int match_addr;
-    private short ipbyte;
-    private int code_size;
-
-    private int previous_codeword;
-    private int ip_bytecount, op_bytecount;
-    private int max_string_length;
+    private int op_bytecount;
     private final InputStream ip_file;
 
     //=======================================================================
     // Constructors
     //=======================================================================
 
-    // Default constructor
-    public Comp(InputStream ip_file) {
-        this(MAXWORDLENGTH, ip_file);
+    // Constructor with configuration parameters
+    public Comp(InputStream ifp) {
+        ip_file = ifp;
+        op_bytecount = 0;
     }
 
-    // Constructor with configuration parameters
-    public Comp(int maxstrlen, InputStream ifp) {
-        match_length_so_far = 0;
-        set_max_string_length(maxstrlen);
-        ip_file = ifp;
-        ip_bytecount = 0;
-        op_bytecount = 0;
+    @SuppressWarnings("unused")
+    public int getOp_bytecount() {
+        return op_bytecount;
     }
 
     //========================================================================
@@ -76,19 +66,18 @@ public class Comp extends Lz {
     //    (via the packer) to an output stream.                                                                 
     //========================================================================
 
-    protected void compress(Dict dict, Packer packer) throws IOException {
+    public void compress(Dict dict, Packer packer) throws IOException {
 
-        previous_codeword = NULLCW;
-        match_length_so_far = 0;
-        code_size = dict.reset_dictionary();
+        int previous_codeword = NULLCW;
+        int code_size = dict.reset_dictionary();
 
         // Process bytes for the while length of the file.
-        while ((ipbyte = getc(ip_file)) != -1) {
+        short ipbyte;
+        while ((ipbyte = Lz.getc(ip_file)) != -1) {
 
             //output_graphics_data_point();
 
             // Increment the byte counter for each input 
-            ip_bytecount++;
             //System.err.println("ip_bytecount="+ip_bytecount+ " ipbyte="+ipbyte);
 
             // First byte, so we need to go round the loop once more for
@@ -98,20 +87,19 @@ public class Comp extends Lz {
 
                 previous_codeword = convert_to_rootcw(ipbyte);
 
-                // We have an implied root codeword match i.e. match length = 1 
-                match_length_so_far = 1;
+                // We have an implied root codeword match i.e. match length = 1
 
-            // Otherwise, process the string as normal 
+                // Otherwise, process the string as normal
             } else {
              
                 // Match found 
-                if ((match_addr = dict.entry_match(previous_codeword, (byte)ipbyte)) != NOMATCH) {
+                int match_addr;
+                if ((match_addr = dict.entry_match(previous_codeword, (byte) ipbyte)) != NOMATCH) {
 
                     // A match increases our string length representation by
                     // one. This is used simply to check that we can fit on
                     // the stack at decompression (shouldn't reach this 
                     // limit).
-                    match_length_so_far++;
 
                     // Previous matched codeword becomes codeword value of dictionary 
                     // entry we've just matched 
@@ -124,13 +112,12 @@ public class Comp extends Lz {
                     op_bytecount += packer.pack(previous_codeword, code_size);
 
                     // Build an entry for the new string (if possible) 
-                    code_size = dict.build_entry(previous_codeword, (byte)ipbyte);
+                    code_size = dict.build_entry(previous_codeword, (byte) ipbyte);
                 
                     // Carry forward the input byte as a 'matched' root codeword 
                     previous_codeword = convert_to_rootcw(ipbyte);
 
                     // Now we have just a single root codeword match, yet to be processed
-                    match_length_so_far = 1;
 
                 }
 
@@ -145,8 +132,8 @@ public class Comp extends Lz {
             op_bytecount += packer.pack(previous_codeword, code_size);
 
             // Pipeline flushed, so no previous codeword 
+            //noinspection UnusedAssignment
             previous_codeword = NULLCW;
-            match_length_so_far = 0;
         }
 
         // We let the packer know we've finished and thus to flush its pipeline 
@@ -157,13 +144,6 @@ public class Comp extends Lz {
     //=======================================================================
     // Internal access functions
     //=======================================================================
-    private int get_max_string_length() { 
-        return max_string_length; 
-    }
-
-    private void set_max_string_length(int val) { 
-        max_string_length = val; 
-    }
 
     private int convert_to_rootcw(short byte_val) { 
         return (int)byte_val; 

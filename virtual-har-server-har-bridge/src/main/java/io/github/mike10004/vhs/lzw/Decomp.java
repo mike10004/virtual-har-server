@@ -46,7 +46,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Stack;
 
-public class Decomp extends Lz {
+public class Decomp implements LzConsts {
 
     // Configurable parameter
     private int max_string_length;
@@ -54,19 +54,17 @@ public class Decomp extends Lz {
     // Algorithm variables 
     private int                  previous_codeword = NULLCW;
     private int                  code_size         = MINCWLEN;
-    private int                  ip_bytecount      = 0;
-    private int                  op_bytecount      = 0;
-    private int                  last_word_length;
     private byte                 string_terminator_byte;
 
     private final OutputStream op_file;
     private IntRef               ip_codeword       = new IntRef();
-    private Stack<Byte>          stack             = new Stack<Byte>();
+    private Stack<Byte>          stack             = new Stack<>();
 
     //=======================================================================
     // Constructors
     //=======================================================================
 
+    @SuppressWarnings("unused")
     public Decomp(OutputStream ofp) {
         this(MAXWORDLENGTH, ofp);
     }
@@ -86,15 +84,12 @@ public class Decomp extends Lz {
     //    output.                                                   
     //========================================================================
 
-    protected int decompress(Dict dict, Unpacker unpacker) throws IOException {
+    public int decompress(Dict dict, Unpacker unpacker) throws IOException {
 
-        int byte_count;
         IntRef status      = new IntRef(NOERROR);
 
         // Keep going until thare are no more codewords 
-        while ((byte_count = unpacker.unpack(ip_codeword, code_size)) != 0) {
-
-            ip_bytecount += byte_count;
+        while ((unpacker.unpack(ip_codeword, code_size)) != 0) {
 
             if (dict.codeword_valid(ip_codeword.value)) {
 
@@ -120,7 +115,7 @@ public class Decomp extends Lz {
 
         } // end while 
 
-        flush(op_file);
+        Lz.flush(op_file);
 
         return status.value;
     }
@@ -175,43 +170,25 @@ public class Decomp extends Lz {
 
             // It is an error to have a codeword which overflows the stack 
             if (stack.size() == max_string_length) {
-                throw new IOException(String.format("decompress: Error --- BAD WORD LENGTH"));
+                throw new IOException("decompress: Error --- BAD WORD LENGTH");
 //                errflag.value = DECOMPRESSION_ERROR;
 //                return 0;
             }
 
             // Push the current byte value on the stack 
-            stack.push(new Byte(byte_val));
+            stack.push(byte_val);
 
         } // end while 
 
-        // Remember the length of the codeword string so that it can be
-        // capped within the main decompression algorithm 
-        last_word_length = stack.size();
-
         // Now flush the stack to the output stream 
         do {
-	    Byte pop_val;
-	    
-	    pop_val = stack.pop();
-            putc(pop_val.byteValue(), op_file);
-            op_bytecount++;
+            Byte pop_val;
+
+            pop_val = stack.pop();
+            Lz.putc(pop_val.byteValue(), op_file);
         } while (!stack.empty());
 
         // Return the last flushed byte, for use in building dictionary entries
         return byte_val;
-    }
-
-    //========================================================================
-    // Internal reset and conversion methods
-    //========================================================================
-
-    private void reset_decompression_engine () { 
-        previous_codeword = NULLCW; 
-        stack.clear(); 
-    }
-
-    private byte root_byte_value(int codeword) { 
-        return (byte)codeword; 
     }
 }

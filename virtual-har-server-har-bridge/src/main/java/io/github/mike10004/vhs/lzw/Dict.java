@@ -37,7 +37,7 @@
 
 package io.github.mike10004.vhs.lzw;
 
-public class Dict extends Lz {
+public class Dict implements LzConsts {
 
     // Internal data structures
     private int[][]     indirection_table = new int[DICTFULL][256];

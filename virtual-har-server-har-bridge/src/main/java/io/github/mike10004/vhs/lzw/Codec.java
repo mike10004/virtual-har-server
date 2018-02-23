@@ -37,26 +37,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public class Codec extends Lz {
+public class Codec implements LzConsts {
 
-    // References to codec objects
-    private Dict     dict;
-    private Packer   packer;
-    private Comp     comp; 
-    private Decomp   decomp; 
-    private Unpacker unpacker; 
-
-    // The following variables are initialised to the equivalent of
-    // a hardware reset. 
-    private int previous_codeword;
-
-    // IO configuration 
+    // IO configuration
 //    private String ip_filename;
 //    private String op_filename;
 //    private BufferedOutputStream ofp;
 //    private BufferedInputStream  ifp;
 
-    private int config_max_str_len;
+    private final int config_max_str_len;
 
     //=======================================================================
     // Constructor
@@ -66,54 +55,69 @@ public class Codec extends Lz {
     //=======================================================================
 
     public Codec() {
-        previous_codeword = NULLCW;
         config_max_str_len = MAXWORDLENGTH;
     }
 
     //=======================================================================
     // Configure and run the codec                                                         
     //=======================================================================
-    public int compress(InputStream ifp, OutputStream ofp) throws IOException {
-        return run(true, ifp, ofp);
+    public void compress(InputStream ifp, OutputStream ofp) throws IOException {
+        run(true, ifp, ofp);
     }
 
-    public int decompress(InputStream ifp, OutputStream ofp) throws IOException {
-        return run(false, ifp, ofp);
+    public void decompress(InputStream ifp, OutputStream ofp) throws IOException {
+        run(false, ifp, ofp);
     }
 
-    private int run (boolean compress_mode, InputStream ifp, OutputStream ofp) throws IOException {
+    private void run (boolean compress_mode, InputStream ifp, OutputStream ofp) throws IOException {
 
         int status = NOERROR;
     
         // Create a dictionary (inform whether compressing or decompressing---
         // dictionary is used as CAM in compression, SRAM in decompression)
-        dict = new Dict(compress_mode);
+        Dict dict = new Dict(compress_mode);
 
         // Select compression/decompression routines as specified 
         if (compress_mode) {
 
             // Create a packer (arguments configure formatter)
-            packer = new Packer(compress_mode, ofp);
+            Packer packer = new Packer(ofp);
 
             // Create a compression encoder
-            comp = new Comp(config_max_str_len, ifp);
+            Comp comp = new Comp(ifp);
 
             // Connect dictionary and packer, and start compressing from input stream
             comp.compress(dict, packer);
 
         } else {
             // Create an unpacker (arguments configure formatter)
-            unpacker = new Unpacker(compress_mode, ifp);
+            Unpacker unpacker = new Unpacker(ifp);
 
             // Create a decompression decoder
-            decomp = new Decomp(config_max_str_len, ofp);
+            Decomp decomp = new Decomp(config_max_str_len, ofp);
 
             // Connect dictionary and unpacker, and start decompressing from input stream
             status = decomp.decompress(dict, unpacker);
 
         }
+        if (status != NOERROR) {
+            throw new LzwException("status " + status);
+        }
+    }
 
-        return status;
+    @SuppressWarnings("unused")
+    static class LzwException extends IOException {
+        public LzwException(Throwable cause) {
+            super(cause);
+        }
+
+        public LzwException(String message) {
+            super(message);
+        }
+
+        public LzwException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
 }

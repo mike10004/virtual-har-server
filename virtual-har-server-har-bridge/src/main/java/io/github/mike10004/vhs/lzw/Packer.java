@@ -37,7 +37,7 @@ package io.github.mike10004.vhs.lzw;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class Packer extends Lz {
+public class Packer implements LzConsts {
 
     // Stats & config values
     private int ip_codeword = NULLCW;
@@ -54,7 +54,7 @@ public class Packer extends Lz {
     // Constructors
     //=======================================================================
 
-    public Packer(boolean compmode, OutputStream ofp) {
+    public Packer(OutputStream ofp) {
         op_file = ofp;
     }
 
@@ -83,14 +83,14 @@ public class Packer extends Lz {
         // Normally this is whilst there are whole bytes, but the last (NULL)
         // codeword causes a flush of ALL remaining bits 
         while (residue >= ((ip_codeword != NULLCW) ? BYTESIZE : BITSIZE)) {                        
-            putc((byte)(barrel & BYTEMASK), op_file);           
+            Lz.putc((byte)(barrel & BYTEMASK), op_file);
             byte_count++;                                  
             barrel >>= BYTESIZE;                          
             residue -= BYTESIZE;                          
         }
 
         if (ip_codeword == NULLCW) 
-            flush(op_file);
+            Lz.flush(op_file);
 
         // Return number of bytes output
         return byte_count;
