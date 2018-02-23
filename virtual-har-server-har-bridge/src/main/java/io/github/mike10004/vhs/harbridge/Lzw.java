@@ -1,11 +1,11 @@
-package io.github.mike10004.vhs.lzw;
+package io.github.mike10004.vhs.harbridge;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Stack;
 
-public class Lz {
+public class Lzw {
 
     public static final int BYTESIZE                = 8;
     public static final int BYTEMASK                = 0xff;
@@ -21,7 +21,7 @@ public class Lz {
     public static final int MAXWORDLENGTH           = (1 << MAXCWLEN);
     public static final int NOERROR                 = 0;
 
-    private Lz() {}
+    private Lzw() {}
 
     // Get a byte from a buffered input
     public static short getc(InputStream ip) throws IOException {
