@@ -1,6 +1,5 @@
 package io.github.mike10004.vhs.harbridge;
 
-import io.github.mike10004.vhs.harbridge.Lzw;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

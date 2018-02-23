@@ -7,35 +7,35 @@ import java.util.Stack;
 
 public class Lzw {
 
-    public static final int BYTESIZE                = 8;
-    public static final int BYTEMASK                = 0xff;
-    public static final int BITSIZE                 = 1;
-    public static final int FIRSTCW                 = 0x100;
-    public static final int NULLCW                  = 0xFFFF;
-    public static final int EOFFLUSH                = NULLCW;
-    public static final int MINCWLEN                = 9;
-    public static final int MAXCWLEN                = 12;
-    public static final int CODEWORDMASK            = ((1 << MAXCWLEN) - 1);
-    public static final int DICTFULL                = (1 << MAXCWLEN);
-    public static final int NOMATCH                 = DICTFULL;
-    public static final int MAXWORDLENGTH           = (1 << MAXCWLEN);
-    public static final int NOERROR                 = 0;
+    private static final int BYTESIZE                = 8;
+    private static final int BYTEMASK                = 0xff;
+    private static final int BITSIZE                 = 1;
+    private static final int FIRSTCW                 = 0x100;
+    private static final int NULLCW                  = 0xFFFF;
+    private static final int EOFFLUSH                = NULLCW;
+    private static final int MINCWLEN                = 9;
+    private static final int MAXCWLEN                = 12;
+    private static final int CODEWORDMASK            = ((1 << MAXCWLEN) - 1);
+    private static final int DICTFULL                = (1 << MAXCWLEN);
+    private static final int NOMATCH                 = DICTFULL;
+    private static final int MAXWORDLENGTH           = (1 << MAXCWLEN);
+    private static final int NOERROR                 = 0;
 
     private Lzw() {}
 
     // Get a byte from a buffered input
-    public static short getc(InputStream ip) throws IOException {
+    private static short getc(InputStream ip) throws IOException {
         int rbyte;
         rbyte = ip.read();
         return (short)rbyte;
     }
 
     // Write a byte to a buffered input
-    public static void putc(byte val, OutputStream op) throws IOException {
+    private static void putc(byte val, OutputStream op) throws IOException {
         op.write(val);
     }
 
-    public static void flush(OutputStream op) throws IOException {
+    private static void flush(OutputStream op) throws IOException {
         op.flush();
     }
 
