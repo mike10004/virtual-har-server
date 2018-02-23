@@ -203,11 +203,10 @@ public class Hars {
         }
     }
 
-    static class LzwCompressor extends OutputFilterCompressor {
-
+    static class LzwCompressor implements ContentEncodingCompressor {
         @Override
-        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
-            throw new IOException("lzw compression not supported");
+        public byte[] compress(byte[] uncompressed) {
+            return new LzwCompressor().compress(uncompressed);
         }
     }
 
