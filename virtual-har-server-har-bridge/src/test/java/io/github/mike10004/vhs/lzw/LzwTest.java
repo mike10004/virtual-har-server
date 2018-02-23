@@ -17,13 +17,13 @@ class LzwTest {
         byte[] inbytes = data.getBytes();
         System.out.format("%d input bytes%n", inbytes.length);
         try (InputStream bin = new ByteArrayInputStream(inbytes)) {
-            new Codec().compress(bin, buffer1);
+            new Lz.Codec().compress(bin, buffer1);
         }
         byte[] compressedBytes = buffer1.toByteArray();
         System.out.format("%d compressed bytes%n", compressedBytes.length);
         ByteArrayOutputStream buffer2 = new ByteArrayOutputStream(data.length() + 16);
         try (InputStream bin = new ByteArrayInputStream(compressedBytes)) {
-            new Codec().decompress(bin, buffer2);
+            new Lz.Codec().decompress(bin, buffer2);
         }
         byte[] decompressedBytes = buffer2.toByteArray();
         System.out.format("%d decompressed bytes%n", decompressedBytes.length);
