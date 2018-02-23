@@ -2,7 +2,7 @@ package io.github.mike10004.vhs.nanohttpd;
 
 import com.google.common.io.ByteStreams;
 import com.google.common.net.MediaType;
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 
 import javax.annotation.Nullable;

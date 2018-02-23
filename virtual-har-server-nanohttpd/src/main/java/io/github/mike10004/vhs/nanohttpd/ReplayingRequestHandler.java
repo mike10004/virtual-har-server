@@ -1,8 +1,8 @@
 package io.github.mike10004.vhs.nanohttpd;
 
-import fi.iki.elonen.NanoHTTPD;
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import fi.iki.elonen.NanoHTTPD.Response;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;

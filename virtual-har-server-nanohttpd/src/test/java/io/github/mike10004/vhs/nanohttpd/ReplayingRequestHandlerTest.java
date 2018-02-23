@@ -4,6 +4,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
+import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.common.net.HostAndPort;
@@ -17,6 +18,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import de.sstoehr.harreader.model.HarEntry;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.nanochamp.server.NanoControl;
 import io.github.mike10004.nanochamp.server.NanoResponse;
 import io.github.mike10004.nanochamp.server.NanoServer;
@@ -27,23 +31,20 @@ import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import io.github.mike10004.vhs.nanohttpd.HarMaker.EntrySpec;
+import io.github.mike10004.vhs.testsupport.Tests;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Reader;
+import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -53,14 +54,20 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReplayingRequestHandlerTest {
+
+    private static final boolean debug = false;
 
     final static ImmutableList<EntrySpec> specs = ImmutableList.of(
             new EntrySpec(RequestSpec.get(URI.create("http://example.com/one")), NanoResponse.status(200).plainTextUtf8("one")),
@@ -90,13 +97,27 @@ class ReplayingRequestHandlerTest {
     @Test
     void serve() throws Exception {
         File harFile = new File(getClass().getResource("/replay-test-1.har").toURI());
-        dumpHar(harFile);
+        if (debug) dumpHar(harFile);
         List<de.sstoehr.harreader.model.HarEntry> entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
         EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
         EntryMatcher heuristic = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE).createEntryMatcher(entries, parser);
         List<RequestSpec> requestsToMake = specs.stream().map(s -> s.request).collect(Collectors.toList());
         requestsToMake.add(RequestSpec.get(URI.create("http://example.com/three-not-found")));
-        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.identity());
+        AtomicInteger counter = new AtomicInteger(0);
+        ReplayingRequestHandler requestHandler = new ReplayingRequestHandler(heuristic, ResponseManager.identity()) {
+            @Nullable
+            @Override
+            public Response serve(IHTTPSession session) {
+                NanoHTTPD.Response response = super.serve(session);
+                counter.incrementAndGet();
+                if (response != null) {
+                    System.out.format("response %d: %s %s %s%n", counter.get(), response.getStatus(), response.getRequestMethod(), session.getUri());
+                } else {
+                    System.out.format("response %d: no response created by ReplayingRequestHandler%n", counter.get());
+                }
+                return response;
+            }
+        };
         int NOT_FOUND_CODE = 404;
         NanoServer server = NanoServer.builder()
                 .session(requestHandler)
@@ -105,23 +126,13 @@ class ReplayingRequestHandlerTest {
         Multimap<RequestSpec, ImmutableHttpResponse> interactions = ArrayListMultimap.create();
         try (NanoControl proxyControl = server.startServer()) {
             HostAndPort proxyAddress = proxyControl.getSocketAddress();
-            HttpClientBuilder clientBuilder = HttpClients.custom()
-                    .setProxy(new HttpHost(proxyAddress.getHost(), proxyAddress.getPort(), "http"));
-            try (CloseableHttpClient client = clientBuilder.build()) {
-                for (RequestSpec requestSpec : requestsToMake) {
-                    HttpUriRequest request = new HttpGet(requestSpec.url);
-                    System.out.format("request: %s%n", request);
-                    try (CloseableHttpResponse response = client.execute(request)) {
-                        ImmutableHttpResponse capturedResponse = ImmutableHttpResponse.builder(response.getStatusLine().getStatusCode())
-                                .addHeaders(Stream.of(response.getAllHeaders()).map(header -> {
-                                    return new SimpleImmutableEntry<>(header.getName(), header.getValue());
-                                })).content(toByteSource(response.getEntity()))
-                                .build();
-                        System.out.format("response: %s%n", response);
-                        System.out.format("response content: %s%n", StringUtils.abbreviate(stringifyContent(capturedResponse), 128));
-                        interactions.put(requestSpec, capturedResponse);
-                    }
-                }
+            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("localhost", proxyAddress.getPort()));
+            for (int i = 0; i < requestsToMake.size(); i++) {
+                RequestSpec requestSpec = requestsToMake.get(i);
+                System.out.format("request %d: %s%n", i + 1, requestSpec.url);
+                ImmutableHttpResponse capturedResponse = fetch(proxy, requestSpec.url);
+                System.out.format("response content: %s%n", StringUtils.abbreviate(stringifyContent(capturedResponse), 128));
+                interactions.put(requestSpec, capturedResponse);
             }
         }
         assertEquals(requestsToMake.size(), interactions.size(), "num interactions == num specs");
@@ -133,6 +144,33 @@ class ReplayingRequestHandlerTest {
                 Assertions.assertEquals(NOT_FOUND_CODE, response.status, "response.status for unspec'd request");
             }
         });
+    }
+
+    private static boolean isErrorCode(int statuscode) {
+        return statuscode / 100 >= 4;
+    }
+
+    private static ImmutableHttpResponse fetch(Proxy proxy, URI url) throws IOException {
+        checkArgument("http".equals(url.getScheme()) || "https".equals(url.getScheme()));
+        HttpURLConnection conn = (HttpURLConnection) url.toURL().openConnection(proxy);
+        try {
+            int status = conn.getResponseCode();
+            ImmutableHttpResponse.Builder b = ImmutableHttpResponse.builder(status);
+            conn.getHeaderFields().forEach((name, values) -> {
+                if (name != null) {
+                    b.addHeaders(values.stream().filter(Objects::nonNull)
+                            .map(value -> new SimpleImmutableEntry<>(name, value)));
+                }
+            });
+            byte[] data;
+            try (InputStream stream = isErrorCode(status) ? conn.getErrorStream() : conn.getInputStream()) {
+                data = ByteStreams.toByteArray(stream);
+            }
+            b.content(ByteSource.wrap(data));
+            return b.build();
+        } finally {
+            conn.disconnect();
+        }
     }
 
     @Nullable
@@ -151,10 +189,11 @@ class ReplayingRequestHandlerTest {
         }
     }
 
-    static ByteSource toByteSource(HttpEntity entity) throws IOException {
-        byte[] bytes = EntityUtils.toByteArray(entity);
-        return ByteSource.wrap(bytes); // for debugging, so we can look at the bytes here
-    }
+//    static ByteSource toByteSource(HttpEntity entity) throws IOException {
+//        byte[] bytes = EntityUtils.toByteArray(entity);
+//        return ByteSource.wrap(bytes); // for debugging, so we can look at the bytes here
+//    }
+
     private static JsonPrimitive abbreviatePrimitive(JsonPrimitive primitive) {
         if (primitive.isString()) {
             return new JsonPrimitive(StringUtils.abbreviateMiddle(primitive.getAsString(), "...", 64));
