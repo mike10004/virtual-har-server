@@ -35,7 +35,8 @@
 
 package io.github.mike10004.vhs.lzw;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class Comp extends Lz {
 
@@ -47,19 +48,19 @@ public class Comp extends Lz {
     private int previous_codeword;
     private int ip_bytecount, op_bytecount;
     private int max_string_length;
-    private final BufferedInputStream ip_file;
+    private final InputStream ip_file;
 
     //=======================================================================
     // Constructors
     //=======================================================================
 
     // Default constructor
-    public Comp(BufferedInputStream ip_file) {
+    public Comp(InputStream ip_file) {
         this(MAXWORDLENGTH, ip_file);
     }
 
     // Constructor with configuration parameters
-    public Comp(int maxstrlen, BufferedInputStream ifp) {
+    public Comp(int maxstrlen, InputStream ifp) {
         match_length_so_far = 0;
         set_max_string_length(maxstrlen);
         ip_file = ifp;

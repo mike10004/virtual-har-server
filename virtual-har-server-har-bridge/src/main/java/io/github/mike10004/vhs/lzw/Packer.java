@@ -33,15 +33,16 @@
 //=======================================================================
 
 package io.github.mike10004.vhs.lzw;
-                  
-import java.io.*;
+
+import java.io.IOException;
+import java.io.OutputStream;
 
 public class Packer extends Lz {
 
     // Stats & config values
     private int ip_codeword = NULLCW;
 
-    private final BufferedOutputStream op_file;
+    private final OutputStream op_file;
 
     // Barrel shift register used to formulate the output bytes 
     private long barrel = 0;
@@ -53,7 +54,7 @@ public class Packer extends Lz {
     // Constructors
     //=======================================================================
 
-    public Packer(boolean compmode, BufferedOutputStream ofp) {
+    public Packer(boolean compmode, OutputStream ofp) {
         op_file = ofp;
     }
 

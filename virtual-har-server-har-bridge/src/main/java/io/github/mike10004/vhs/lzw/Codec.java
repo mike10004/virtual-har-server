@@ -33,7 +33,9 @@
 
 package io.github.mike10004.vhs.lzw;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class Codec extends Lz {
 
@@ -71,15 +73,15 @@ public class Codec extends Lz {
     //=======================================================================
     // Configure and run the codec                                                         
     //=======================================================================
-    public int compress(BufferedInputStream ifp, BufferedOutputStream ofp) throws IOException {
+    public int compress(InputStream ifp, OutputStream ofp) throws IOException {
         return run(true, ifp, ofp);
     }
 
-    public int decompress(BufferedInputStream ifp, BufferedOutputStream ofp) throws IOException {
+    public int decompress(InputStream ifp, OutputStream ofp) throws IOException {
         return run(false, ifp, ofp);
     }
 
-    private int run (boolean compress_mode, BufferedInputStream ifp, BufferedOutputStream ofp) throws IOException {
+    private int run (boolean compress_mode, InputStream ifp, OutputStream ofp) throws IOException {
 
         int status = NOERROR;
     

@@ -1,9 +1,21 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Resources;
+import com.google.common.net.HttpHeaders;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.GZIPInputStream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class HarsTest {
 
@@ -40,6 +52,34 @@ class HarsTest {
                     ", encoding='" + encoding + '\'' +
                     ", size=" + size +
                     '}';
+        }
+    }
+
+    @Test
+    public void testGzippedHtml() throws Exception {
+        String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
+        JsonObject response = new JsonParser().parse(json).getAsJsonObject();
+        JsonObject content = response.getAsJsonObject("content");
+        String contentEncodingHeaderValue = ImmutableList.copyOf(response.getAsJsonArray("headers")).stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(el -> HttpHeaders.CONTENT_ENCODING.equalsIgnoreCase(el.get("name").getAsString()))
+                .map(el -> el.get("value").getAsString())
+                .findFirst().orElse(null);
+        String text = content.get("text").getAsString();
+        byte[] data = Hars.translateResponseContent(content.get("mimeType").getAsString(),
+                text,
+                response.get("bodySize").getAsLong(),
+                content.get("size").getAsLong(),
+                contentEncodingHeaderValue,
+                null, null);
+        byte[] decompressed = gunzip(data);
+        String decompressedText = new String(decompressed, StandardCharsets.UTF_8);
+        assertEquals(text, decompressedText, "text");
+    }
+
+    private static byte[] gunzip(byte[] compressed) throws IOException {
+        try (GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(compressed), compressed.length * 2)) {
+            return ByteStreams.toByteArray(gzin);
         }
     }
 }

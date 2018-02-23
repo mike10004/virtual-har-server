@@ -1,19 +1,32 @@
 package io.github.mike10004.vhs.harbridge;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Ints;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Static utility methods relating to HAR data.
  */
 public class Hars {
+
+    private static final Logger log = LoggerFactory.getLogger(Hars.class);
 
     private static final CharMatcher BASE_64_ALPHABET = CharMatcher.inRange('A', 'Z')
             .or(CharMatcher.inRange('a', 'z'))
@@ -76,21 +89,152 @@ public class Hars {
     }
 
     /**
-     * Encodes HAR content or post-data as bytes. If the data is base-64-encoded, then this
-     * just decodes it. If the data is a string, then this encodes that in the charset
-     * specified by the content-type.
+     * Encodes HAR response content data or request post-data as bytes.
+     * If the data is base-64-encoded, then this just decodes it.
+     * If the data is a string, then this encodes that in the charset specified by the content-type.
      * @param contentType the content type (required)
      * @param text the content or POST-data text
      * @param length the content length or size field
-     * @param encoding the encoding field (from HAR content object)
+     * @param harContentEncoding the encoding field (from HAR content object)
      * @param comment the comment
-     * @param direction the message direction (HTTP request or response)
      * @return a byte array containing encoded
      */
     @Nullable
-    public static byte[] translateContent(String contentType, @Nullable String text, @Nullable Long length,
-                                          @SuppressWarnings("SameParameterValue") @Nullable String encoding,
-                                          @SuppressWarnings("unused") @Nullable String comment, MessageDirection direction) {
+    public static byte[] translateRequestContent(String contentType,
+                                          @Nullable String text,
+                                          @Nullable Long length,
+                                          @Nullable String harContentEncoding,
+                                          @SuppressWarnings("unused") @Nullable String comment) {
+        MessageDirection direction = MessageDirection.REQUEST;
+        return translateContent(contentType, text, length, harContentEncoding, comment, direction);
+    }
+
+    /**
+     *
+     * @param contentType content MIME type
+     * @param text data
+     * @param bodySize Size of the received response body in bytes.
+     *                 Set to zero in case of responses coming from the cache (304).
+     *                 Set to -1 if the info is not available.
+     * @param contentSize Length of the returned content in bytes.
+     *                    Should be equal to response.bodySize if there is no compression
+     *                    and bigger when the content has been compressed.
+     * @param contentEncodingHeaderValue value of the Content-Encoding header
+     * @param harContentEncoding value of the HAR content "encoding" field
+     * @param comment HAR content comment
+     * @return translated data
+     */
+    @Nullable
+    public static byte[] translateResponseContent(String contentType,
+                                          @Nullable String text,
+                                          @Nullable Long bodySize,
+                                          @Nullable Long contentSize,
+                                          @Nullable String contentEncodingHeaderValue,
+                                          @Nullable String harContentEncoding,
+                                          @SuppressWarnings("unused") @Nullable String comment) {
+        MessageDirection direction = MessageDirection.RESPONSE;
+        @Nullable byte[] uncompressed = translateContent(contentType, text, bodySize, harContentEncoding, comment, direction);
+        if (uncompressed == null) {
+            return null;
+        }
+        if (bodySize == null || contentSize == null || Objects.equals(bodySize, contentSize)) {
+            return uncompressed;
+        }
+        if (contentSize.longValue() < bodySize.longValue()) {
+            log.warn("contentSize {} < bodySize {} but this violates HAR spec", contentSize, bodySize);
+            return uncompressed;
+        }
+        // invariant here: bodySize < contentSize, implying data must be compressed
+        if (contentEncodingHeaderValue == null) {
+            // if content-encoding header value is null, we'll assume gzip for now;
+            // TODO try to determine compression type by sniffing data
+            contentEncodingHeaderValue = CONTENT_ENCODING_GZIP;
+        }
+        List<String> encodings = Splitter.on(Pattern.compile("\\s*,\\s*")).omitEmptyStrings().trimResults()
+                .splitToList(contentEncodingHeaderValue)
+                .stream().map(String::toLowerCase).collect(Collectors.toList());
+        byte[] data = uncompressed;
+        for (String encoding : encodings) {
+            ContentEncodingCompressor compressor = compressors.get(encoding);
+            if (compressor == null) {
+                log.warn("failed to compress data because {} is not supported; this will likely flummox some user agents", encoding);
+                return uncompressed;
+            }
+            try {
+                data = compressor.compress(data);
+            } catch (IOException e) {
+                log.warn("failed to compress data with " + encoding + "; returning uncompressed", e);
+                return uncompressed;
+            }
+        }
+        return data;
+    }
+
+    interface ContentEncodingCompressor {
+        byte[] compress(byte[] uncompressed) throws IOException;
+    }
+
+    static abstract class OutputFilterCompressor implements ContentEncodingCompressor {
+        @Override
+        public byte[] compress(byte[] uncompressed) throws IOException {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(uncompressed.length);
+            try (OutputStream gout = openCompressionFilter(baos, uncompressed.length)) {
+                gout.write(uncompressed);
+            }
+            return baos.toByteArray();
+        }
+
+        protected abstract OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException;
+    }
+
+    static class GzipCompressor extends OutputFilterCompressor {
+
+        @Override
+        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
+            return new GZIPOutputStream(sink);
+        }
+    }
+
+    static class ZlibCompressor extends OutputFilterCompressor {
+
+        @Override
+        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) {
+            return new java.util.zip.DeflaterOutputStream(sink);
+        }
+    }
+
+    static class LzwCompressor extends OutputFilterCompressor {
+
+        @Override
+        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
+            throw new IOException("lzw compression not supported");
+        }
+    }
+
+    static class BrotliCompressor extends OutputFilterCompressor {
+        @Override
+        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
+            throw new IOException("brotli compression not supported");
+        }
+    }
+
+    private static final String CONTENT_ENCODING_GZIP = "gzip";
+
+    private static final ImmutableMap<String, ContentEncodingCompressor> compressors = ImmutableMap.<String, ContentEncodingCompressor>builder()
+            .put(CONTENT_ENCODING_GZIP, new GzipCompressor())
+            .put("deflate", new ZlibCompressor())
+            .put("compress", new LzwCompressor())
+            .put("identity", input -> input)
+            .put("br", new BrotliCompressor())
+            .build();
+
+    @Nullable
+    private static byte[] translateContent(String contentType,
+                                          @Nullable String text,
+                                          @Nullable Long length,
+                                          @Nullable String harContentEncoding,
+                                          @SuppressWarnings("unused") @Nullable String comment,
+                                          MessageDirection direction) {
         if (text == null) {
             return null;
         }
@@ -99,7 +243,7 @@ public class Hars {
             //noinspection ResultOfMethodCallIgnored
             Ints.checkedCast(length); // argument check
         }
-        boolean base64 = isBase64Encoded(contentType, text, encoding, length);
+        boolean base64 = isBase64Encoded(contentType, text, harContentEncoding, length);
         if (base64) {
             return Base64.getDecoder().decode(text);
         } else {

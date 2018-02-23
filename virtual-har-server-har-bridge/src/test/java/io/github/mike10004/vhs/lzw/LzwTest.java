@@ -2,31 +2,28 @@ package io.github.mike10004.vhs.lzw;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LzwTest {
 
     @Test
     void compressAndDecompress() throws Exception {
         String data = "This is a low-entropy string. This is a low-entropy string. This is a low-entropy string. This is a low-entropy string.";
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream(data.length() + 16);
+        ByteArrayOutputStream buffer1 = new ByteArrayOutputStream(data.length() + 16);
         byte[] inbytes = data.getBytes();
         System.out.format("%d input bytes%n", inbytes.length);
-        try (BufferedInputStream bin = new BufferedInputStream(new ByteArrayInputStream(inbytes));
-            BufferedOutputStream bout = new BufferedOutputStream(buffer)) {
-            new Codec().compress(bin, bout);
+        try (InputStream bin = new ByteArrayInputStream(inbytes)) {
+            new Codec().compress(bin, buffer1);
         }
-        byte[] compressedBytes = buffer.toByteArray();
+        byte[] compressedBytes = buffer1.toByteArray();
         System.out.format("%d compressed bytes%n", compressedBytes.length);
         ByteArrayOutputStream buffer2 = new ByteArrayOutputStream(data.length() + 16);
-        try (BufferedInputStream bin = new BufferedInputStream(new ByteArrayInputStream(compressedBytes));
-            BufferedOutputStream bout = new BufferedOutputStream(buffer2)) {
-            new Codec().decompress(bin, bout);
+        try (InputStream bin = new ByteArrayInputStream(compressedBytes)) {
+            new Codec().decompress(bin, buffer2);
         }
         byte[] decompressedBytes = buffer2.toByteArray();
         System.out.format("%d decompressed bytes%n", decompressedBytes.length);

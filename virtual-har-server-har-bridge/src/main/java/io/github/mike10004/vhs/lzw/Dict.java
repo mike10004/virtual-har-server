@@ -47,16 +47,6 @@ public class Dict extends Lz {
     private DictEntry[] dictionary = new DictEntry[DICTFULL];
 
 
-    //=======================================================================
-    // Constructors
-    //=======================================================================
-    public Dict() {
-        compress_mode = true;
-
-        for (int idx = 0; idx < DICTFULL; idx++) 
-            dictionary[idx] = new DictEntry(); 
-    }
-    
     public Dict(boolean mode) {
         compress_mode = mode;
 

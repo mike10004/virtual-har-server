@@ -1,8 +1,13 @@
 package io.github.mike10004.vhs.harbridge.sstoehr;
 
+import com.google.common.base.MoreObjects;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import de.sstoehr.harreader.model.HarContent;
 import de.sstoehr.harreader.model.HarEntry;
+import de.sstoehr.harreader.model.HarHeader;
 import de.sstoehr.harreader.model.HarPostData;
 import de.sstoehr.harreader.model.HarPostDataParam;
 import de.sstoehr.harreader.model.HarRequest;
@@ -13,10 +18,13 @@ import io.github.mike10004.vhs.harbridge.Hars;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
 
 public class SstoehrHarBridge implements HarBridge<HarEntry> {
 
@@ -58,6 +66,13 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     }
 
     @Nullable
+    protected static Long nullIfNegative(@Nullable Long value) {
+        if (value == null) {
+            return null;
+        }
+        return nullIfNegative(value.longValue());
+    }
+
     protected static Long nullIfNegative(long value) {
         return value < 0 ? null : value;
     }
@@ -73,16 +88,27 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
             if (!params.isEmpty()) {
                 throw new UnsupportedOperationException("not yet implemented: parsing post data params");
             }
-            return Hars.translateContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment(), Hars.MessageDirection.REQUEST);
+            return Hars.translateRequestContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment());
         }
         return null;
     }
 
     @Override
     public byte[] getResponseBody(HarEntry entry) throws IOException {
-        HarResponse rsp =getResponse(entry);
-        HarContent content = checkNotNull(rsp.getContent(), "response.content");
-        return Hars.translateContent(content.getMimeType(), content.getText(), nullIfNegative(content.getSize()), content.getEncoding(), content.getComment(), Hars.MessageDirection.RESPONSE);
+        HarResponse rsp = getResponse(entry);
+        HarContent content = requireNonNull(rsp.getContent(), "response.content");
+        @Nullable Long harContentSize = nullIfNegative(content.getSize());
+        @Nullable Long bodySize = nullIfNegative(rsp.getBodySize());
+        List<HarHeader> headers = MoreObjects.firstNonNull(rsp.getHeaders(), Collections.emptyList());
+        @Nullable String contentEncodingHeaderValue = headers.stream()
+                .filter(h -> HttpHeaders.CONTENT_ENCODING.equalsIgnoreCase(h.getName()))
+                .map(HarHeader::getValue)
+                .findFirst().orElse(null);
+        @Nullable String harContentEncoding = Strings.emptyToNull(content.getEncoding());
+        @Nullable String contentType = content.getMimeType();
+        @Nullable String comment = content.getComment();
+        @Nullable String text = content.getText();
+        return Hars.translateResponseContent(contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment);
     }
 
     @SuppressWarnings("Duplicates")

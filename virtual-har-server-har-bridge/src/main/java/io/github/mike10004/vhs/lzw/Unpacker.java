@@ -35,8 +35,9 @@
 //=======================================================================
 
 package io.github.mike10004.vhs.lzw;
-                  
-import java.io.*;
+
+import java.io.IOException;
+import java.io.InputStream;
 
 public class Unpacker extends Lz {
 
@@ -49,13 +50,13 @@ public class Unpacker extends Lz {
 
     private short codeword_length;
 
-    private final BufferedInputStream ip_file;
+    private final InputStream ip_file;
     
     //=======================================================================
     // Constructors
     //=======================================================================
 
-    public Unpacker(boolean compmode, BufferedInputStream ifp) {
+    public Unpacker(boolean compmode, InputStream ifp) {
         currlen = 0;
         barrel= 0;
         op_codeword = 0;

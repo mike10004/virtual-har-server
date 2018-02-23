@@ -42,8 +42,9 @@
 
 package io.github.mike10004.vhs.lzw;
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Stack;
 
 public class Decomp extends Lz {
 
@@ -58,7 +59,7 @@ public class Decomp extends Lz {
     private int                  last_word_length;
     private byte                 string_terminator_byte;
 
-    private final BufferedOutputStream op_file;
+    private final OutputStream op_file;
     private IntRef               ip_codeword       = new IntRef();
     private Stack<Byte>          stack             = new Stack<Byte>();
 
@@ -66,11 +67,11 @@ public class Decomp extends Lz {
     // Constructors
     //=======================================================================
 
-    public Decomp(BufferedOutputStream ofp) {
+    public Decomp(OutputStream ofp) {
         this(MAXWORDLENGTH, ofp);
     }
 
-    public Decomp(int maxstr, BufferedOutputStream ofp) {
+    public Decomp(int maxstr, OutputStream ofp) {
         max_string_length = maxstr;
         op_file = ofp;
         stack.clear();

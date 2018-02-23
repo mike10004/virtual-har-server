@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map.Entry;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
@@ -49,13 +50,24 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
 
     public HttpRespondable parseResponse(E entry) throws IOException {
         int status = bridge.getResponseStatus(entry);
-        byte[] body = bridge.getResponseBody(entry);
+        @Nullable byte[] body = bridge.getResponseBody(entry);
+        @Nullable MediaType contentType = bridge.getResponseContentType(entry);
+        return constructRespondable(status, body, () -> bridge.getResponseHeaders(entry), contentType);
+    }
+
+    protected HttpRespondable constructRespondable(int status, @Nullable byte[] body, Supplier<Stream<Entry<String, String>>> headersGetter, @Nullable MediaType contentType) {
         Multimap<String, String> headers = ArrayListMultimap.create();
-        bridge.getResponseHeaders(entry).forEach(header -> {
+        headersGetter.get().forEach(header -> {
             headers.put(header.getKey(), header.getValue());
         });
-        MediaType contentType = bridge.getResponseContentType(entry);
+        if (body == null) {
+            body = EMPTY_BYTE_ARRAY;
+        }
+        if (contentType == null) {
+            contentType = MediaType.OCTET_STREAM;
+        }
         return HttpRespondable.inMemory(status, headers, contentType, body);
     }
 
+    private static final byte[] EMPTY_BYTE_ARRAY = {};
 }

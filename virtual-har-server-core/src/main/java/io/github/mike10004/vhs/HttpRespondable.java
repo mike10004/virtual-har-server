@@ -8,6 +8,8 @@ import java.io.OutputStream;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
+
 public interface HttpRespondable {
 
     int getStatus();
@@ -21,6 +23,9 @@ public interface HttpRespondable {
     MediaType writeBody(OutputStream out) throws IOException;
 
     static HttpRespondable inMemory(int status, Multimap<String, String> headers, MediaType contentType, byte[] body) {
+        requireNonNull(headers, "headers");
+        requireNonNull(contentType, "contentType");
+        requireNonNull(body, "body");
         return new HttpRespondable() {
             @Override
             public int getStatus() {
