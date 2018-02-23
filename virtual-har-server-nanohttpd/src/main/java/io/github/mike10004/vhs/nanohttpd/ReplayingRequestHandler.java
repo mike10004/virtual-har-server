@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.nanohttpd;
 
+import com.google.common.collect.ImmutableList;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.Response;
@@ -20,10 +21,16 @@ public class ReplayingRequestHandler implements io.github.mike10004.nanochamp.se
     private static final EntryParser<IHTTPSession> nanoParser = new HarBridgeEntryParser<>(new NanoBridge());
 
     private final EntryMatcher heuristic;
+    private final ImmutableList<ResponseInterceptor> responseInterceptors;
     private final ResponseManager responseManager;
 
     public ReplayingRequestHandler(EntryMatcher heuristic, ResponseManager responseManager) {
+        this(heuristic, ImmutableList.of(), responseManager);
+    }
+
+    public ReplayingRequestHandler(EntryMatcher heuristic, Iterable<ResponseInterceptor> responseInterceptors, ResponseManager responseManager) {
         this.heuristic = heuristic;
+        this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
         this.responseManager = responseManager;
     }
 
@@ -39,10 +46,18 @@ public class ReplayingRequestHandler implements io.github.mike10004.nanochamp.se
         }
         @Nullable HttpRespondable bestEntry = heuristic.findTopEntry(request);
         if (bestEntry != null) {
+            bestEntry = filterThroughInterceptors(request, bestEntry);
             NanoHTTPD.Response response = responseManager.toResponse(bestEntry);
             return response;
         }
         return null;
+    }
+
+    protected HttpRespondable filterThroughInterceptors(ParsedRequest request, HttpRespondable respondable) {
+        for (ResponseInterceptor interceptor : responseInterceptors) {
+            respondable = interceptor.intercept(request, respondable);
+        }
+        return respondable;
     }
 
     @SuppressWarnings("unused")

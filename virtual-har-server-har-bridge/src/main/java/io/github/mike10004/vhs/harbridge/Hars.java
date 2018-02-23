@@ -2,16 +2,13 @@ package io.github.mike10004.vhs.harbridge;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Ints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -19,7 +16,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * Static utility methods relating to HAR data.
@@ -148,14 +144,12 @@ public class Hars {
         if (contentEncodingHeaderValue == null) {
             // if content-encoding header value is null, we'll assume gzip for now;
             // TODO try to determine compression type by sniffing data
-            contentEncodingHeaderValue = CONTENT_ENCODING_GZIP;
+            contentEncodingHeaderValue = HttpContentCodecs.CONTENT_ENCODING_GZIP;
         }
-        List<String> encodings = Splitter.on(Pattern.compile("\\s*,\\s*")).omitEmptyStrings().trimResults()
-                .splitToList(contentEncodingHeaderValue)
-                .stream().map(String::toLowerCase).collect(Collectors.toList());
+        List<String> encodings = HttpContentCodecs.parseEncodings(contentEncodingHeaderValue);
         byte[] data = uncompressed;
         for (String encoding : encodings) {
-            ContentEncodingCompressor compressor = compressors.get(encoding);
+            HttpContentCodec compressor = HttpContentCodecs.getCodec(encoding);
             if (compressor == null) {
                 log.warn("failed to compress data because {} is not supported; this will likely flummox some user agents", encoding);
                 return uncompressed;
@@ -169,63 +163,6 @@ public class Hars {
         }
         return data;
     }
-
-    interface ContentEncodingCompressor {
-        byte[] compress(byte[] uncompressed) throws IOException;
-    }
-
-    static abstract class OutputFilterCompressor implements ContentEncodingCompressor {
-        @Override
-        public byte[] compress(byte[] uncompressed) throws IOException {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(uncompressed.length);
-            try (OutputStream gout = openCompressionFilter(baos, uncompressed.length)) {
-                gout.write(uncompressed);
-            }
-            return baos.toByteArray();
-        }
-
-        protected abstract OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException;
-    }
-
-    static class GzipCompressor extends OutputFilterCompressor {
-
-        @Override
-        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
-            return new GZIPOutputStream(sink);
-        }
-    }
-
-    static class ZlibCompressor extends OutputFilterCompressor {
-
-        @Override
-        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) {
-            return new java.util.zip.DeflaterOutputStream(sink);
-        }
-    }
-
-    static class LzwCompressor implements ContentEncodingCompressor {
-        @Override
-        public byte[] compress(byte[] uncompressed) {
-            return new LzwCompressor().compress(uncompressed);
-        }
-    }
-
-    static class BrotliCompressor extends OutputFilterCompressor {
-        @Override
-        protected OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
-            throw new IOException("brotli compression not supported");
-        }
-    }
-
-    private static final String CONTENT_ENCODING_GZIP = "gzip";
-
-    private static final ImmutableMap<String, ContentEncodingCompressor> compressors = ImmutableMap.<String, ContentEncodingCompressor>builder()
-            .put(CONTENT_ENCODING_GZIP, new GzipCompressor())
-            .put("deflate", new ZlibCompressor())
-            .put("compress", new LzwCompressor())
-            .put("identity", input -> input)
-            .put("br", new BrotliCompressor())
-            .build();
 
     @Nullable
     private static byte[] translateContent(String contentType,

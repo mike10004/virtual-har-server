@@ -7,7 +7,7 @@
     <groupId>com.github.mike10004</groupId>
     <artifactId>virtual-har-server</artifactId>
     <packaging>pom</packaging>
-    <version>0.1-SNAPSHOT</version>
+    <version>0.2-SNAPSHOT</version>
     <modules>
         <module>virtual-har-server-core</module>
         <module>virtual-har-server-nanohttpd</module>
