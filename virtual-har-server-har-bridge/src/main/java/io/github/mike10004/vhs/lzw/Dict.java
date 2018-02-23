@@ -37,20 +37,20 @@
 
 package io.github.mike10004.vhs.lzw;
 
-public class Dict implements LzConsts {
+public class Dict {
 
     // Internal data structures
-    private int[][]     indirection_table = new int[DICTFULL][256];
-    private int         next_available_codeword = FIRSTCW;
-    private int         codeword_len = MINCWLEN;
+    private int[][]     indirection_table = new int[Lz.DICTFULL][256];
+    private int         next_available_codeword = Lz.FIRSTCW;
+    private int         codeword_len = Lz.MINCWLEN;
     private boolean     compress_mode;
-    private DictEntry[] dictionary = new DictEntry[DICTFULL];
+    private DictEntry[] dictionary = new DictEntry[Lz.DICTFULL];
 
 
     public Dict(boolean mode) {
         compress_mode = mode;
 
-        for (int idx = 0; idx < DICTFULL; idx++) 
+        for (int idx = 0; idx < Lz.DICTFULL; idx++)
             dictionary[idx] = new DictEntry(); 
     }
     
@@ -63,9 +63,9 @@ public class Dict implements LzConsts {
 
     public int reset_dictionary() {
         // Reset common state 
-        next_available_codeword = FIRSTCW;
+        next_available_codeword = Lz.FIRSTCW;
 
-        return MINCWLEN;
+        return Lz.MINCWLEN;
     }
 
     //=======================================================================
@@ -86,10 +86,10 @@ public class Dict implements LzConsts {
 
         // Test to see if we have a match at the address, and is in the
         // valid portion of the dictionary. 
-        if (!(addr >= FIRSTCW && addr < next_available_codeword &&
+        if (!(addr >= Lz.FIRSTCW && addr < next_available_codeword &&
                     (dictionary_entry_byte(addr) == byte_val) &&
                     (dictionary_entry_pointer(addr) == pointer)))
-            addr = NOMATCH; // Set addr to indicate no match 
+            addr = Lz.NOMATCH; // Set addr to indicate no match
         
         // Return address of match (or no match) 
         return addr;
@@ -125,17 +125,17 @@ public class Dict implements LzConsts {
         // the current output codeword size, then increment the current codeword 
         // size. The decompression builds lag behind by one, so this event
         // is anticipated by an entry. 
-        if (codeword_len < MAXCWLEN) {
+        if (codeword_len < Lz.MAXCWLEN) {
             if (next_available_codeword == (1 << codeword_len) - (!compress_mode ? 1 : 0))
                 codeword_len++;
 
         // If decompressing and we're one short of having a full dictionary,
         // reset the codeword_len. This anticipates a reset next build,
         // in a similar way as for the codeword length increment. 
-        } else if (!compress_mode && next_available_codeword == DICTFULL-1)  
-            codeword_len = MINCWLEN;
+        } else if (!compress_mode && next_available_codeword == Lz.DICTFULL-1)
+            codeword_len = Lz.MINCWLEN;
 
-        if (next_available_codeword != DICTFULL)
+        if (next_available_codeword != Lz.DICTFULL)
             ++next_available_codeword;
 
         return codeword_len;
@@ -153,7 +153,7 @@ public class Dict implements LzConsts {
     }
 
     protected boolean dictionary_full () { 
-        return next_available_codeword == DICTFULL; 
+        return next_available_codeword == Lz.DICTFULL;
     }
 
     protected byte dictionary_entry_byte (int address) { 
@@ -165,7 +165,7 @@ public class Dict implements LzConsts {
     }
 
     protected boolean root_codeword (int codeword) { 
-        return  codeword < FIRSTCW; 
+        return  codeword < Lz.FIRSTCW;
     }
 
     //=======================================================================

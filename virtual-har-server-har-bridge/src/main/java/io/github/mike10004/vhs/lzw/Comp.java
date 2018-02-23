@@ -38,7 +38,7 @@ package io.github.mike10004.vhs.lzw;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class Comp implements LzConsts {
+public class Comp {
 
     private int op_bytecount;
     private final InputStream ip_file;
@@ -68,7 +68,7 @@ public class Comp implements LzConsts {
 
     public void compress(Dict dict, Packer packer) throws IOException {
 
-        int previous_codeword = NULLCW;
+        int previous_codeword = Lz.NULLCW;
         int code_size = dict.reset_dictionary();
 
         // Process bytes for the while length of the file.
@@ -83,7 +83,7 @@ public class Comp implements LzConsts {
             // First byte, so we need to go round the loop once more for
             // another byte, and find the root codeword representation for 
             // this byte.  
-            if (previous_codeword == NULLCW) {
+            if (previous_codeword == Lz.NULLCW) {
 
                 previous_codeword = convert_to_rootcw(ipbyte);
 
@@ -94,7 +94,7 @@ public class Comp implements LzConsts {
              
                 // Match found 
                 int match_addr;
-                if ((match_addr = dict.entry_match(previous_codeword, (byte) ipbyte)) != NOMATCH) {
+                if ((match_addr = dict.entry_match(previous_codeword, (byte) ipbyte)) != Lz.NOMATCH) {
 
                     // A match increases our string length representation by
                     // one. This is used simply to check that we can fit on
@@ -128,16 +128,16 @@ public class Comp implements LzConsts {
         // If we've terminated and still have a codeword to output, 
         // then we have to output the codeword which represents all the 
         // matched  string so far (and it could be just a root codeword).
-        if (previous_codeword != NULLCW) {
+        if (previous_codeword != Lz.NULLCW) {
             op_bytecount += packer.pack(previous_codeword, code_size);
 
             // Pipeline flushed, so no previous codeword 
             //noinspection UnusedAssignment
-            previous_codeword = NULLCW;
+            previous_codeword = Lz.NULLCW;
         }
 
         // We let the packer know we've finished and thus to flush its pipeline 
-        op_bytecount += packer.pack(EOFFLUSH, code_size);
+        op_bytecount += packer.pack(Lz.EOFFLUSH, code_size);
 
     } // end compress() 
 

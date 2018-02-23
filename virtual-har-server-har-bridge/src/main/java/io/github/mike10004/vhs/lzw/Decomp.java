@@ -46,14 +46,14 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Stack;
 
-public class Decomp implements LzConsts {
+public class Decomp {
 
     // Configurable parameter
     private int max_string_length;
 
     // Algorithm variables 
-    private int                  previous_codeword = NULLCW;
-    private int                  code_size         = MINCWLEN;
+    private int                  previous_codeword = Lz.NULLCW;
+    private int                  code_size         = Lz.MINCWLEN;
     private byte                 string_terminator_byte;
 
     private final OutputStream op_file;
@@ -66,7 +66,7 @@ public class Decomp implements LzConsts {
 
     @SuppressWarnings("unused")
     public Decomp(OutputStream ofp) {
-        this(MAXWORDLENGTH, ofp);
+        this(Lz.MAXWORDLENGTH, ofp);
     }
 
     public Decomp(int maxstr, OutputStream ofp) {
@@ -86,7 +86,7 @@ public class Decomp implements LzConsts {
 
     public int decompress(Dict dict, Unpacker unpacker) throws IOException {
 
-        IntRef status      = new IntRef(NOERROR);
+        IntRef status      = new IntRef(Lz.NOERROR);
 
         // Keep going until thare are no more codewords 
         while ((unpacker.unpack(ip_codeword, code_size)) != 0) {
@@ -104,7 +104,7 @@ public class Decomp implements LzConsts {
                 // We must build a dictionary entry using the last codeword fully 
                 // processed and the first flushed byte of the present codeword (if we 
                 // aren't flushed)
-                if (previous_codeword != NULLCW)
+                if (previous_codeword != Lz.NULLCW)
                     code_size = dict.build_entry(previous_codeword, string_terminator_byte);
 
             } else {  // No valid entry exists
@@ -139,14 +139,14 @@ public class Decomp implements LzConsts {
 
         // While not at the end of the list, follow the linked list, placing
         // byte values on a stack 
-        while (pointer != NULLCW) {
+        while (pointer != Lz.NULLCW) {
 
             // If not a root codeword ... 
             if (!dict.root_codeword(pointer)) {
 
                 // If an entry in the linked list is the next free codeword,
                 // then it must need building as a KwK case. 
-                if (dict.is_next_free_entry(pointer) && (previous_codeword != NULLCW)) {
+                if (dict.is_next_free_entry(pointer) && (previous_codeword != Lz.NULLCW)) {
 
                     // The pointer and byte values are as for the KwK build;
                     // i.e. the last codeword that was input and its first
@@ -165,7 +165,7 @@ public class Decomp implements LzConsts {
             // We have to generate the entry for root codewords 
             } else {
                 byte_val = (byte)pointer;
-                pointer = NULLCW;
+                pointer = Lz.NULLCW;
             }
 
             // It is an error to have a codeword which overflows the stack 

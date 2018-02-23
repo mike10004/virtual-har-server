@@ -37,7 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public class Codec implements LzConsts {
+public class Codec {
 
     // IO configuration
 //    private String ip_filename;
@@ -55,7 +55,7 @@ public class Codec implements LzConsts {
     //=======================================================================
 
     public Codec() {
-        config_max_str_len = MAXWORDLENGTH;
+        config_max_str_len = Lz.MAXWORDLENGTH;
     }
 
     //=======================================================================
@@ -71,7 +71,7 @@ public class Codec implements LzConsts {
 
     private void run (boolean compress_mode, InputStream ifp, OutputStream ofp) throws IOException {
 
-        int status = NOERROR;
+        int status = Lz.NOERROR;
     
         // Create a dictionary (inform whether compressing or decompressing---
         // dictionary is used as CAM in compression, SRAM in decompression)
@@ -100,7 +100,7 @@ public class Codec implements LzConsts {
             status = decomp.decompress(dict, unpacker);
 
         }
-        if (status != NOERROR) {
+        if (status != Lz.NOERROR) {
             throw new LzwException("status " + status);
         }
     }

@@ -37,10 +37,10 @@ package io.github.mike10004.vhs.lzw;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class Packer implements LzConsts {
+public class Packer {
 
     // Stats & config values
-    private int ip_codeword = NULLCW;
+    private int ip_codeword = Lz.NULLCW;
 
     private final OutputStream op_file;
 
@@ -72,24 +72,24 @@ public class Packer implements LzConsts {
         int byte_count = 0;
 
         // Append codeword to the bottom of the barrel shifter
-        barrel |= ((ip_codeword & CODEWORDMASK) << residue); 
+        barrel |= ((ip_codeword & Lz.CODEWORDMASK) << residue);
 
         // If not the last (NULL) codeword, increment the number of bits on the
         // barrel shifter by the current codeword size
-        if (ip_codeword != NULLCW)
+        if (ip_codeword != Lz.NULLCW)
             residue += codeword_length;
 
         // While there are sufficient bits, place bytes on the output. 
         // Normally this is whilst there are whole bytes, but the last (NULL)
         // codeword causes a flush of ALL remaining bits 
-        while (residue >= ((ip_codeword != NULLCW) ? BYTESIZE : BITSIZE)) {                        
-            Lz.putc((byte)(barrel & BYTEMASK), op_file);
+        while (residue >= ((ip_codeword != Lz.NULLCW) ? Lz.BYTESIZE : Lz.BITSIZE)) {
+            Lz.putc((byte)(barrel & Lz.BYTEMASK), op_file);
             byte_count++;                                  
-            barrel >>= BYTESIZE;                          
-            residue -= BYTESIZE;                          
+            barrel >>= Lz.BYTESIZE;
+            residue -= Lz.BYTESIZE;
         }
 
-        if (ip_codeword == NULLCW) 
+        if (ip_codeword == Lz.NULLCW)
             Lz.flush(op_file);
 
         // Return number of bytes output

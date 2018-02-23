@@ -39,7 +39,7 @@ package io.github.mike10004.vhs.lzw;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class Unpacker implements LzConsts {
+public class Unpacker {
 
     private short ipbyte;
     private int currlen, barrel;
@@ -87,10 +87,10 @@ public class Unpacker implements LzConsts {
             byte_count++;
 
             // Put the byte on the barrel shifter 
-            barrel |= (ipbyte & BYTEMASK) << currlen;
+            barrel |= (ipbyte & Lz.BYTEMASK) << currlen;
 
             // We have another byte's worth of bits 
-            currlen += BYTESIZE;
+            currlen += Lz.BYTESIZE;
 
         // Continue until we have enough bits for a codeword.
         } while (currlen < codeword_length);
