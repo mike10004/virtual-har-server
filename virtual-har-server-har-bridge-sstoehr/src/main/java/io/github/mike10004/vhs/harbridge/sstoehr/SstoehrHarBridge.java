@@ -2,7 +2,7 @@ package io.github.mike10004.vhs.harbridge.sstoehr;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import de.sstoehr.harreader.model.HarContent;
@@ -14,6 +14,7 @@ import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.Hars;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -59,12 +60,6 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
                 .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
     }
 
-    @Override
-    public Stream<Entry<String, String>> getResponseHeaders(HarEntry entry) {
-        return checkNotNull(getResponse(entry).getHeaders(), "response.headers").stream()
-                .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
-    }
-
     @Nullable
     protected static Long nullIfNegative(@Nullable Long value) {
         if (value == null) {
@@ -77,10 +72,9 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         return value < 0 ? null : value;
     }
 
-    @SuppressWarnings("Duplicates")
     @Nullable
     @Override
-    public byte[] getRequestPostData(HarEntry entry) throws IOException {
+    public ByteSource getRequestPostData(HarEntry entry) throws IOException {
         HarRequest request = getRequest(entry);
         HarPostData postData = request.getPostData();
         if (postData != null) {
@@ -94,7 +88,16 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     }
 
     @Override
-    public byte[] getResponseBody(HarEntry entry) throws IOException {
+    public ResponseData getResponseData(ParsedRequest request, HarEntry entry) throws IOException {
+        return new ResponseData(getResponseHeaders(entry), getResponseContentType(entry), getResponseBody(request, entry));
+    }
+
+    private Stream<Entry<String, String>> getResponseHeaders(HarEntry entry) {
+        return checkNotNull(getResponse(entry).getHeaders(), "response.headers").stream()
+                .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
+    }
+
+    private ByteSource getResponseBody(ParsedRequest request, HarEntry entry) throws IOException {
         HarResponse rsp = getResponse(entry);
         HarContent content = requireNonNull(rsp.getContent(), "response.content");
         @Nullable Long harContentSize = nullIfNegative(content.getSize());
@@ -108,12 +111,10 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         @Nullable String contentType = content.getMimeType();
         @Nullable String comment = content.getComment();
         @Nullable String text = content.getText();
-        return Hars.translateResponseContent(contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment);
+        return Hars.translateResponseContent(request, contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment).body;
     }
 
-    @SuppressWarnings("Duplicates")
-    @Override
-    public MediaType getResponseContentType(HarEntry entry) {
+    private MediaType getResponseContentType(HarEntry entry) {
         HarResponse rsp = getResponse(entry);
         HarContent content = checkNotNull(rsp.getContent(), "response.content");
         String contentType = checkNotNull(content.getMimeType(), "response.content.mimeType");

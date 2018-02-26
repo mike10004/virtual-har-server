@@ -52,13 +52,17 @@ public interface HttpRespondable {
      * @return the new instance
      */
     static HttpRespondable inMemory(int status, Multimap<String, String> headers, MediaType contentType, byte[] body) {
+        return inMemory(status, headers, contentType, ByteSource.wrap(body));
+    }
+
+    static HttpRespondable inMemory(int status, Multimap<String, String> headers, MediaType contentType, ByteSource body) {
         requireNonNull(headers, "headers");
         requireNonNull(contentType, "contentType");
         requireNonNull(body, "body");
         return ImmutableHttpRespondable.builder(status)
                 .headers(headers)
                 .contentType(contentType)
-                .bodySource(ByteSource.wrap(body))
+                .bodySource(body)
                 .build();
     }
 

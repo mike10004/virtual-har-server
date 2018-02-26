@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 
 import java.io.ByteArrayInputStream;
@@ -9,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public interface HttpContentCodec {
+
     default byte[] compress(byte[] uncompressed) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(uncompressed.length);
         try (OutputStream gout = openCompressionFilter(baos, uncompressed.length)) {

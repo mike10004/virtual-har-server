@@ -2,6 +2,7 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +49,7 @@ public class HeuristicEntryMatcher implements EntryMatcher {
             List<ParsedEntry> parsedEntries = new ArrayList<>(entries.size());
             for (E entry : entries) {
                 ParsedRequest request = requestParser.parseRequest(entry);
-                HttpRespondable respondable = requestParser.parseResponse(entry);
+                HttpRespondable respondable = requestParser.parseResponse(request, entry);
                 ParsedEntry parsedEntry = new ParsedEntry(request, respondable);
                 parsedEntries.add(parsedEntry);
             }

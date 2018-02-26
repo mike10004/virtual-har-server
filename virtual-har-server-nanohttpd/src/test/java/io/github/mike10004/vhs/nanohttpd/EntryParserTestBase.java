@@ -1,10 +1,8 @@
 package io.github.mike10004.vhs.nanohttpd;
 
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimap;
 import io.github.mike10004.vhs.EntryParser;
-import io.github.mike10004.vhs.HttpMethod;
-import io.github.mike10004.vhs.ParsedRequest;
+import io.github.mike10004.vhs.harbridge.HttpMethod;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

@@ -4,6 +4,8 @@ import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 import com.google.common.io.ByteSource;
+import io.github.mike10004.vhs.harbridge.HttpMethod;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
 import javax.annotation.Nullable;
 import java.io.IOException;

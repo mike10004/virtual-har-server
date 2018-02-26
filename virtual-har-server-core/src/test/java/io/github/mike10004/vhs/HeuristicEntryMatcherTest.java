@@ -3,6 +3,7 @@ package io.github.mike10004.vhs;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

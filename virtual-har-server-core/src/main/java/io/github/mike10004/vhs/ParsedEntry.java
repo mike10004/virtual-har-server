@@ -1,5 +1,7 @@
 package io.github.mike10004.vhs;
 
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
+
 import java.util.Objects;
 
 public class ParsedEntry {

@@ -2,10 +2,13 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.ByteSource;
 import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
-import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HarBridge;
+import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
+import io.github.mike10004.vhs.harbridge.HttpMethod;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -14,7 +17,6 @@ import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,7 +49,11 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         URI parsedUrl = parseUrl(method, bridge.getRequestUrl(harEntry));
         Multimap<String, String> query = parseQuery(parsedUrl);
         Multimap<String, String> indexedHeaders = indexHeaders(bridge.getRequestHeaders(harEntry));
-        byte[] body = bridge.getRequestPostData(harEntry);
+        ByteSource bodySource = bridge.getRequestPostData(harEntry);
+        byte[] body = null;
+        if (bodySource != null) {
+            body = bodySource.read();
+        }
         return ParsedRequest.inMemory(method, parsedUrl, query, indexedHeaders, body);
     }
 
@@ -68,11 +74,11 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         return HttpRequests.parseQuery(uri);
     }
 
-    public HttpRespondable parseResponse(E entry) throws IOException {
+    @Override
+    public HttpRespondable parseResponse(ParsedRequest request, E entry) throws IOException {
         int status = bridge.getResponseStatus(entry);
-        @Nullable byte[] body = bridge.getResponseBody(entry);
-        @Nullable MediaType contentType = bridge.getResponseContentType(entry);
-        return constructRespondable(status, body, () -> bridge.getResponseHeaders(entry), contentType);
+        ResponseData responseData = bridge.getResponseData(request, entry);
+        return constructRespondable(status, responseData);
     }
 
     protected static void replaceContentLength(Multimap<String, String> headers, @Nullable Long value) {
@@ -92,20 +98,13 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         }
     }
 
-    protected static HttpRespondable constructRespondable(int status, @Nullable byte[] body, Supplier<Stream<Entry<String, String>>> headersGetter, @Nullable MediaType contentType) {
+    protected static HttpRespondable constructRespondable(int status, ResponseData responseData) throws IOException {
         Multimap<String, String> headers = ArrayListMultimap.create();
-        headersGetter.get().forEach(header -> {
+        responseData.headers.forEach(header -> {
             headers.put(header.getKey(), header.getValue());
         });
-        if (body == null) {
-            body = EMPTY_BYTE_ARRAY;
-        }
-        replaceContentLength(headers, (long) body.length);
-        if (contentType == null) {
-            contentType = MediaType.OCTET_STREAM;
-        }
-        return HttpRespondable.inMemory(status, headers, contentType, body);
+        replaceContentLength(headers, responseData.body.size());
+        return HttpRespondable.inMemory(status, headers, responseData.contentType, responseData.body);
     }
 
-    private static final byte[] EMPTY_BYTE_ARRAY = {};
 }

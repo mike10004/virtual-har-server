@@ -30,7 +30,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  * #L%
  */
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.harbridge;
 
 @SuppressWarnings("unused")
 public enum HttpMethod {

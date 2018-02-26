@@ -1,9 +1,10 @@
 package io.github.mike10004.vhs.nanohttpd;
 
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
-import com.google.common.net.MediaType;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import io.github.mike10004.vhs.harbridge.HarBridge;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
@@ -29,34 +30,17 @@ public class NanoBridge implements HarBridge<IHTTPSession> {
         return entry.getHeaders().entrySet().stream();
     }
 
-    @Override
-    public Stream<Map.Entry<String, String>> getResponseHeaders(IHTTPSession entry) {
-        throw new UnsupportedOperationException("NanoBridge does not support response parsing");
-    }
-
     @Nullable
     @Override
-    public byte[] getRequestPostData(IHTTPSession entry) throws IOException {
-        byte[] body = null;
+    public ByteSource getRequestPostData(IHTTPSession entry) throws IOException {
         switch (entry.getMethod()) {
             case POST:
             case PUT:
                 try (InputStream in = getOrSubstituteEmpty(entry.getInputStream())) {
-                    body = ByteStreams.toByteArray(in);
+                    return ByteSource.wrap(ByteStreams.toByteArray(in));
                 }
         }
-        return body;
-    }
-
-    @Nullable
-    @Override
-    public byte[] getResponseBody(IHTTPSession entry) {
-        throw new UnsupportedOperationException("NanoBridge does not support response parsing");
-    }
-
-    @Override
-    public MediaType getResponseContentType(IHTTPSession entry) {
-        throw new UnsupportedOperationException("NanoBridge does not support response parsing");
+        return null;
     }
 
     @Override
@@ -66,5 +50,10 @@ public class NanoBridge implements HarBridge<IHTTPSession> {
 
     private static InputStream getOrSubstituteEmpty(InputStream in) {
         return in == null ? new ByteArrayInputStream(new byte[0]) : in;
+    }
+
+    @Override
+    public ResponseData getResponseData(ParsedRequest request, IHTTPSession entry) throws IOException {
+        throw new UnsupportedOperationException("NanoBridge does not support response parsing");
     }
 }

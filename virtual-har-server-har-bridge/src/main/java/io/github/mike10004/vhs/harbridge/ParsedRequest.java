@@ -1,10 +1,10 @@
-package io.github.mike10004.vhs;
+package io.github.mike10004.vhs.harbridge;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.ByteSource;
 
 import javax.annotation.Nullable;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -57,23 +57,24 @@ public abstract class ParsedRequest {
 
     static class MemoryRequest extends ParsedRequest {
 
-        @Nullable
-        private final byte[] body;
+        private final ByteSource bodySource;
+        private final boolean bodyPresent;
 
         public MemoryRequest(HttpMethod method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
             super(method, url, query, indexedHeaders);
-            this.body = body == null ? null : Arrays.copyOf(body, body.length);
+            if (bodyPresent = (body == null)) {
+                bodySource = ByteSource.empty();
+            } else {
+                bodySource = ByteSource.wrap(Arrays.copyOf(body, body.length));
+            }
         }
 
         public InputStream openBodyStream() throws IOException {
-            if (body == null) {
-                throw new IOException("no body present");
-            }
-            return new ByteArrayInputStream(body);
+            return bodySource.openStream();
         }
 
         public boolean isBodyPresent() {
-            return body != null;
+            return bodyPresent;
         }
     }
 

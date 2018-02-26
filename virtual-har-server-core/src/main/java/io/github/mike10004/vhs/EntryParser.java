@@ -1,5 +1,7 @@
 package io.github.mike10004.vhs;
 
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
+
 import java.io.IOException;
 
 /**
@@ -21,6 +23,6 @@ public interface EntryParser<E> {
      * @param harEntry the HAR entry
      * @return the parsed response
      */
-    HttpRespondable parseResponse(E harEntry) throws IOException;
+    HttpRespondable parseResponse(ParsedRequest request, E harEntry) throws IOException;
 
 }

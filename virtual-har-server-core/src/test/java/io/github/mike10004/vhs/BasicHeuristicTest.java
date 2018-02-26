@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs;
 
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 

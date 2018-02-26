@@ -13,7 +13,6 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.Method.GET;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NanoBridgeTest {
@@ -70,6 +69,7 @@ class NanoBridgeTest {
             return method;
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public Map<String, String> getParms() {
             return ImmutableMap.of();

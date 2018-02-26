@@ -66,12 +66,13 @@ class HarsTest {
                 .map(el -> el.get("value").getAsString())
                 .findFirst().orElse(null);
         String text = content.get("text").getAsString();
-        byte[] data = Hars.translateResponseContent(content.get("mimeType").getAsString(),
+        ParsedRequest request = null;
+        byte[] data = Hars.translateResponseContent(request, content.get("mimeType").getAsString(),
                 text,
                 response.get("bodySize").getAsLong(),
                 content.get("size").getAsLong(),
                 contentEncodingHeaderValue,
-                null, null);
+                null, null).body.read();
         byte[] decompressed = gunzip(data);
         String decompressedText = new String(decompressed, StandardCharsets.UTF_8);
         assertEquals(text, decompressedText, "text");

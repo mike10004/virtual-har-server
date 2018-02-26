@@ -2,6 +2,8 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.net.MediaType;
+import io.github.mike10004.vhs.harbridge.HttpMethod;
+import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -13,7 +15,7 @@ public class Tests {
 
     public static ParsedRequest createRequest(String method, String url) {
         URI uri = URI.create(url);
-        return new ParsedRequest.MemoryRequest(HttpMethod.valueOf(method), uri, HttpRequests.parseQuery(uri), ImmutableMultimap.of(), null);
+        return ParsedRequest.inMemory(HttpMethod.valueOf(method), uri, HttpRequests.parseQuery(uri), ImmutableMultimap.of(), null);
     }
 
     public static String readAsString(HttpRespondable response) throws IOException {

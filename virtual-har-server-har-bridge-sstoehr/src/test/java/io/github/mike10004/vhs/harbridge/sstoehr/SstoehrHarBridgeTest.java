@@ -14,10 +14,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @org.junit.jupiter.api.Disabled
 class SstoehrHarBridgeTest {
 
-    private HarBridge bridge = new SstoehrHarBridge(); 
+    private HarBridge<HarEntry> bridge = new SstoehrHarBridge();
     private HarEntry entry;
-    private byte[] responseBody;
     private Multimap<String, String> requestHeaders, responseHeaders;
+
     @BeforeEach
     private void thing() throws Exception {
         entry = new HarEntry();
@@ -27,15 +27,15 @@ class SstoehrHarBridgeTest {
         HarResponse response = new HarResponse();
         MediaType contentType = MediaType.PLAIN_TEXT_UTF_8;
         //noinspection ConstantConditions
-        responseBody = "hello".getBytes(contentType.charset().get());
+        byte[] responseBody = "hello".getBytes(contentType.charset().get());
         response.setBodySize((long) responseBody.length);
         responseHeaders = ArrayListMultimap.create();
 //        response.setHeaders();
     }
 
     @Test
-    void getResponse() throws Exception {
-        bridge.getResponseBody(entry);
+    void getResponseData() throws Exception {
+        bridge.getResponseData(null, entry);
     }
 
     @Test
