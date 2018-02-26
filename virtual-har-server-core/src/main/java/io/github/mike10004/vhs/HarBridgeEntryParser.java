@@ -2,14 +2,15 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import io.github.mike10004.vhs.ParsedRequest.MemoryRequest;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -27,12 +28,27 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         this.bridge = requireNonNull(bridge);
     }
 
+    protected URI parseUrl(HttpMethod method, String url) {
+        try {
+            if (method == HttpMethod.CONNECT) {
+                HostAndPort hostAndPort = HostAndPort.fromString(url);
+                URI uri = new URI(null, null, hostAndPort.getHost(), hostAndPort.getPortOrDefault(-1), null, null, null);
+                return uri;
+            } else {
+                return new URI(url);
+            }
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("URL has unexpected syntax", e);
+        }
+    }
+
     public ParsedRequest parseRequest(E harEntry) throws IOException {
-        URI parsedUrl = URI.create(bridge.getRequestUrl(harEntry));
+        HttpMethod method = HttpMethod.valueOf(bridge.getRequestMethod(harEntry));
+        URI parsedUrl = parseUrl(method, bridge.getRequestUrl(harEntry));
         Multimap<String, String> query = parseQuery(parsedUrl);
         Multimap<String, String> indexedHeaders = indexHeaders(bridge.getRequestHeaders(harEntry));
         byte[] body = bridge.getRequestPostData(harEntry);
-        return new MemoryRequest(HttpMethod.valueOf(bridge.getRequestMethod(harEntry)), parsedUrl, query, indexedHeaders, body);
+        return ParsedRequest.inMemory(method, parsedUrl, query, indexedHeaders, body);
     }
 
     /**

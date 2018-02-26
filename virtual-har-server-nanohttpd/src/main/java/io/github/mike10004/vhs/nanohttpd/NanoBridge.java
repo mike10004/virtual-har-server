@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 public class NanoBridge implements HarBridge<IHTTPSession> {
+
     @Override
     public String getRequestMethod(IHTTPSession entry) {
         return entry.getMethod().name();

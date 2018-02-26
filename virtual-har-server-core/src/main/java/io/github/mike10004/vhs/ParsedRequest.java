@@ -51,6 +51,10 @@ public abstract class ParsedRequest {
 
     public abstract InputStream openBodyStream() throws IOException;
 
+    public static ParsedRequest inMemory(HttpMethod method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
+        return new MemoryRequest(method, url, query, indexedHeaders, body);
+    }
+
     static class MemoryRequest extends ParsedRequest {
 
         @Nullable
