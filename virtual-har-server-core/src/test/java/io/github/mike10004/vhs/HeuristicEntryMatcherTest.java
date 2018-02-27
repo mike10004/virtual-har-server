@@ -40,6 +40,6 @@ public class HeuristicEntryMatcherTest {
         ParsedRequest request = Tests.createRequest(method, url);
         assert contentType.charset().isPresent();
         HttpRespondable response = HttpRespondable.inMemory(status, ImmutableMultimap.of(HttpHeaders.CONTENT_TYPE, contentType.toString()), contentType, bodyText.getBytes(contentType.charset().get()));
-        return new ParsedEntry(request, response);
+        return new ParsedEntry(request, request_ -> response);
     }
 }

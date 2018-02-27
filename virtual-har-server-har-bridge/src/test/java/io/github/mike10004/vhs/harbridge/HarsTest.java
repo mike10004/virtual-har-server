@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,7 +64,7 @@ class HarsTest {
     }
 
     @Test
-    public void testGzippedHtml() throws Exception {
+    void testGzippedHtml() throws Exception {
         String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
         JsonObject response = new JsonParser().parse(json).getAsJsonObject();
         JsonObject content = response.getAsJsonObject("content");
@@ -96,7 +97,7 @@ class HarsTest {
     }
 
     @Nullable
-    String getFirstHeaderValueFromNameValuePairs(JsonArray arrayOfNameValuePairs, String headerName) {
+    private static String getFirstHeaderValueFromNameValuePairs(JsonArray arrayOfNameValuePairs, String headerName) {
         return ImmutableList.copyOf(arrayOfNameValuePairs).stream()
                 .map(JsonElement::getAsJsonObject)
                 .filter(el -> headerName.equalsIgnoreCase(el.get("name").getAsString()))
@@ -104,8 +105,33 @@ class HarsTest {
                 .findFirst().orElse(null);
     }
 
+    private void test_canServeOriginalResponseContentEncoding(boolean expected, String contentEncoding, String acceptEncoding) {
+        List<String> contentEncodings = Hars.parseContentEncodings(contentEncoding);
+        boolean actual = Hars.canServeOriginalResponseContentEncoding(contentEncodings, acceptEncoding);
+        assertEquals(expected, actual, String.format("expect %s for Content-Encoding: %s with Accept-Encoding: %s", expected, contentEncoding, acceptEncoding));
+    }
+
     @Test
-    public void testResponseEncodedButAcceptEncodingDisallows() throws Exception {
+    void canServeOriginalResponseContentEncoding() {
+        test_canServeOriginalResponseContentEncoding(true, "gzip", "gzip");
+        test_canServeOriginalResponseContentEncoding(true, "gzip", "deflate, gzip;q=1.0, *;q=0.5");
+        test_canServeOriginalResponseContentEncoding(true, "gzip", "gzip, deflate, br");
+        test_canServeOriginalResponseContentEncoding(true, "gzip, br", "gzip, deflate, br");
+        test_canServeOriginalResponseContentEncoding(false, "gzip", null);
+        test_canServeOriginalResponseContentEncoding(false, "gzip", "");
+        test_canServeOriginalResponseContentEncoding(false, "gzip", "deflate;q=1.0, gzip;q=0.0, *;q=0.5");
+        test_canServeOriginalResponseContentEncoding(true, null, null);
+        test_canServeOriginalResponseContentEncoding(true, null, "");
+        test_canServeOriginalResponseContentEncoding(true, "", null);
+        test_canServeOriginalResponseContentEncoding(true, "", "");
+        test_canServeOriginalResponseContentEncoding(true, "identity", null);
+        test_canServeOriginalResponseContentEncoding(true, null, "gzip, deflate, br");
+        test_canServeOriginalResponseContentEncoding(true, "", "gzip, deflate, br");
+        test_canServeOriginalResponseContentEncoding(true, "identity", "gzip, deflate, br");
+    }
+
+    @Test
+    void testResponseEncodedButAcceptEncodingDisallows() throws Exception {
         String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
         JsonObject response = new JsonParser().parse(json).getAsJsonObject();
         JsonObject content = response.getAsJsonObject("content");

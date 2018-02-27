@@ -1,6 +1,11 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
@@ -12,14 +17,19 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Static utility methods relating to HAR data.
@@ -161,8 +171,164 @@ public class Hars {
         }
     }
 
+    private static final Splitter QUALITY_VALUE_SPLITTER = Splitter.on(';').trimResults().omitEmptyStrings();
+
+    static class WeightedEncoding {
+
+        public final String encoding;
+        public final BigDecimal weight;
+
+        public WeightedEncoding(String encoding, BigDecimal weight) {
+            this.encoding = requireNonNull(encoding);
+            this.weight = requireNonNull(weight);
+        }
+
+        /**
+         * Parses a string like `gzip;q=1.0` into an instance.
+         * @param token the string token
+         * @return the weighted encoding instance
+         */
+        public static WeightedEncoding parse(String token) {
+            token = Strings.nullToEmpty(token).trim();
+            if (token.isEmpty()) {
+                throw new IllegalArgumentException("string has no usable content");
+            }
+            Iterator<String> it = QUALITY_VALUE_SPLITTER.split(token).iterator();
+            String encoding = it.next();
+            @Nullable BigDecimal qValue = null;
+            if (it.hasNext()) {
+                String qStr = it.next();
+                qValue = parseQualityValue(qStr);
+            }
+            if (qValue == null) {
+                qValue = BigDecimal.ONE; // "When not present, the default value is 1." <-- https://developer.mozilla.org/en-US/docs/Glossary/Quality_values
+            }
+            return new WeightedEncoding(encoding, qValue);
+        }
+
+        @Nullable
+        static BigDecimal parseQualityValue(@Nullable String qStr) {
+            if (qStr != null) {
+                String[] parts = qStr.split("\\s*=\\s*", 2);
+                if (parts.length == 2) {
+                    String valueStr = parts[1];
+                    return valueOf(valueStr);
+                }
+            }
+            return null;
+        }
+
+        private static BigDecimal valueOf(String decimal) {
+            if ("1.0".equals(decimal) || decimal.matches("^1(\\.0+)?$")) {
+                return BigDecimal.ONE;
+            }
+            if ("0".equals(decimal) || "0.0".equals(decimal) || decimal.matches("^0(\\.0+)?$")) {
+                return BigDecimal.ZERO;
+            }
+            return new BigDecimal(decimal);
+        }
+
+        public boolean isPositive() {
+            return weight.compareTo(BigDecimal.ZERO) > 0;
+        }
+
+        public AcceptDecision accepts(String encoding) {
+            if (this.encoding.equals(encoding)) {
+                return isPositive() ? AcceptDecision.ACCEPT : AcceptDecision.REJECT;
+            }
+            return AcceptDecision.INDETERMINATE;
+        }
+    }
+
+    enum AcceptDecision {
+        ACCEPT, REJECT, INDETERMINATE
+    }
+
+    @VisibleForTesting
+    static ImmutableList<WeightedEncoding> parseAcceptedEncodings(@Nullable String acceptEncodingHeaderValue) {
+        acceptEncodingHeaderValue = Strings.nullToEmpty(acceptEncodingHeaderValue).trim();
+        if (acceptEncodingHeaderValue.isEmpty()) {
+            return ImmutableList.of();
+        }
+        List<String> weightedEncodings = HttpContentCodecs.parseEncodings(acceptEncodingHeaderValue);
+        return weightedEncodings.stream()
+                .map(WeightedEncoding::parse)
+                .collect(ImmutableList.toImmutableList());
+
+    }
+
     /**
-     *
+     * Determines whether the unencoded (i.e. uncompressed) response is to be encoded using the
+     * original response encoding, based on whether the new client accepts it. This ignores some
+     * parts of the HTTP spec, like how to respond if the client explicitly rejects the 'identity' encoding,
+     * which would be very unlikely to occur in practice. For each response content encoding in the given
+     * list, we check that the client's accept-encoding specification explicitly accepts it or that
+     * it is covered under a wildcard acceptance.
+     * @param acceptEncodingHeaderValue the client's Accept-Encoding header value
+     * @param parsedResponseContentEncodings the encodings originally applied to the content in the response captured in the HAR
+     * @return true iff the client specifies that it can accept the encodings of the original response
+     */
+    @VisibleForTesting
+    static boolean canServeOriginalResponseContentEncoding(List<String> parsedResponseContentEncodings, @Nullable String acceptEncodingHeaderValue) {
+        List<WeightedEncoding> acceptsWeighted = parseAcceptedEncodings(acceptEncodingHeaderValue);
+        return canServeOriginalResponseContentEncoding(parsedResponseContentEncodings, acceptsWeighted);
+    }
+
+    @VisibleForTesting
+    static boolean canServeOriginalResponseContentEncoding(List<String> parsedResponseContentEncodingsList, List<WeightedEncoding> acceptsWeighted) {
+        Set<String> parsedResponseContentEncodings = ImmutableSet.copyOf(parsedResponseContentEncodingsList);
+        if (parsedResponseContentEncodings.isEmpty() || onlyContains(parsedResponseContentEncodings, HttpContentCodecs.CONTENT_ENCODING_IDENTITY)) {
+            return true;
+        }
+        if (acceptsWeighted.isEmpty()) {
+            return false;
+        }
+        for (String encoding : parsedResponseContentEncodings) {
+            if (HttpContentCodecs.CONTENT_ENCODING_IDENTITY.equals(encoding)) {
+                continue;
+            }
+            boolean canServeSingle = canServeResponseContentEncoding(encoding, acceptsWeighted);
+            if (!canServeSingle) {
+                return false;
+            }
+        }
+        // if we're here, we know the client can accept each content encoding specified
+        return true;
+    }
+
+    static boolean canServeResponseContentEncoding(String encoding, List<WeightedEncoding> acceptsWeighted) {
+        WeightedEncoding star = null;
+        for (WeightedEncoding we : acceptsWeighted) {
+            AcceptDecision decision = we.accepts(encoding);
+            if (decision == AcceptDecision.ACCEPT) {
+                return true;
+            }
+            if (decision == AcceptDecision.REJECT) {
+                return false;
+            }
+            if ("*".equals(we.encoding)) {
+                star = we;
+            }
+        }
+        // invariant: `encoding` never mentioned in list of weighted encodings
+        if (star != null) {
+            return star.isPositive();
+        }
+        return false;
+    }
+
+    static ImmutableList<String> parseContentEncodings(@Nullable String contentEncodingHeaderValue) {
+        return HttpContentCodecs.parseEncodings(contentEncodingHeaderValue);
+    }
+
+    static <T, U extends T> boolean onlyContains(Set<T> set, U element) {
+        return set.size() == 1 && set.contains(element);
+    }
+
+    /**
+     * Translates the content of a captured response in a HAR to a format
+     * usable for transmitting as a new HTTP response.
+     * @param request the new HTTP request for which the HAR response is to be reconstructed
      * @param contentType content MIME type
      * @param text data
      * @param bodySize Size of the received response body in bytes.
@@ -203,7 +369,12 @@ public class Hars {
             // TODO try to determine compression type by sniffing data
             contentEncodingHeaderValue = HttpContentCodecs.CONTENT_ENCODING_GZIP;
         }
-        List<String> encodings = HttpContentCodecs.parseEncodings(contentEncodingHeaderValue);
+        String acceptEncodingHeaderValue = request.getFirstHeaderValue(HttpHeaders.ACCEPT_ENCODING);
+        List<String> encodings = parseContentEncodings(contentEncodingHeaderValue);
+        if (!canServeOriginalResponseContentEncoding(encodings, acceptEncodingHeaderValue)) {
+            return uncompressedReturnValue;
+        }
+        // TODO delay buffering of the data by composing compressing byte sinks into a byte source
         byte[] data;
         try {
             data = uncompressed.read();
@@ -229,6 +400,11 @@ public class Hars {
         return ResponseContentTranslation.builder(anyChanges ? ByteSource.wrap(data) : uncompressed).build();
     }
 
+    /**
+     * Gets the uncompressed, unencoded data that constitutes the body of a response captured
+     * in a HAR entry, given the various HAR response and HAR content fields that describe it.
+     * @return a byte source that supplies a stream of the response body as unencoded, uncompressed bytes
+     */
     @Nullable
     private static ByteSource getUncompressedContent(String contentType,
                                                      @Nullable String text,
@@ -239,7 +415,7 @@ public class Hars {
         if (text == null) {
             return null;
         }
-        Objects.requireNonNull(contentType, "content type must be non-null");
+        requireNonNull(contentType, "content type must be non-null");
         if (length != null) {
             //noinspection ResultOfMethodCallIgnored
             Ints.checkedCast(length); // argument check
@@ -250,7 +426,7 @@ public class Hars {
         } else {
             Charset charset = direction.DEFAULT_CHARSET;
             try {
-                charset = MediaType.parse(contentType).charset().or(direction.DEFAULT_CHARSET);
+                charset = MediaType.parse(contentType).charset().or(charset);
             } catch (RuntimeException ignore) {
             }
             return CharSource.wrap(text).asByteSource(charset);

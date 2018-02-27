@@ -2,6 +2,7 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
+import io.github.mike10004.vhs.ParsedEntry.HttpRespondableCreator;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,11 +12,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Objects.requireNonNull;
 
 public class HeuristicEntryMatcher implements EntryMatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(HeuristicEntryMatcher.class);
 
     private final ImmutableList<ParsedEntry> entries;
     private final Heuristic heuristic;
@@ -49,8 +53,10 @@ public class HeuristicEntryMatcher implements EntryMatcher {
             List<ParsedEntry> parsedEntries = new ArrayList<>(entries.size());
             for (E entry : entries) {
                 ParsedRequest request = requestParser.parseRequest(entry);
-                HttpRespondable respondable = requestParser.parseResponse(request, entry);
-                ParsedEntry parsedEntry = new ParsedEntry(request, respondable);
+                HttpRespondableCreator respondableCreator = newRequest -> {
+                    return requestParser.parseResponse(newRequest, entry);
+                };
+                ParsedEntry parsedEntry = new ParsedEntry(request, respondableCreator);
                 parsedEntries.add(parsedEntry);
             }
             return new HeuristicEntryMatcher(heuristic, thresholdExclusive, parsedEntries);
@@ -62,7 +68,7 @@ public class HeuristicEntryMatcher implements EntryMatcher {
     @Nullable
     public HttpRespondable findTopEntry(ParsedRequest request) {
         AtomicInteger topRating = new AtomicInteger(thresholdExclusive);
-        @Nullable HttpRespondable topEntry = entries.stream()
+        @Nullable HttpRespondableCreator topEntry = entries.stream()
                 .max(Ordering.<Integer>natural().onResultOf(entry -> {
                     int rating = heuristic.rate(requireNonNull(entry).request, request);
                     if (rating > thresholdExclusive) {
@@ -70,10 +76,14 @@ public class HeuristicEntryMatcher implements EntryMatcher {
                     }
                     return rating;
                 }))
-                .map(ParsedEntry::getResponse)
+                .map(entry -> entry.responseCreator)
                 .orElse(null);
-        if (topRating.get() > thresholdExclusive) {
-            return topEntry;
+        if (topEntry != null && topRating.get() > thresholdExclusive) {
+            try {
+                return topEntry.createRespondable(request);
+            } catch (IOException e) {
+                log.warn("could not create response for top-rated entry", e);
+            }
         }
         return null;
     }

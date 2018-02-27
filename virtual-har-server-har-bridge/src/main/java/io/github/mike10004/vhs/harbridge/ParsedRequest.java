@@ -9,7 +9,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Immutable class that represents an HTTP request.
@@ -40,8 +44,8 @@ public abstract class ParsedRequest {
     public final ImmutableMultimap<String, String> indexedHeaders;
 
     private ParsedRequest(HttpMethod method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders) {
-        this.method = Objects.requireNonNull(method);
-        this.url = Objects.requireNonNull(url);
+        this.method = requireNonNull(method);
+        this.url = requireNonNull(url);
         this.query = query == null ? null : ImmutableMultimap.copyOf(query);
         this.indexedHeaders = ImmutableMultimap.copyOf(indexedHeaders);
 
@@ -78,4 +82,12 @@ public abstract class ParsedRequest {
         }
     }
 
+    @Nullable
+    public String getFirstHeaderValue(String headerName) {
+        requireNonNull(headerName, "headerName");
+        return indexedHeaders.entries().stream()
+                .filter(header -> headerName.equalsIgnoreCase(header.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst().orElse(null);
+    }
 }
