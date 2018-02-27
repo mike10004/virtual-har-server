@@ -81,6 +81,7 @@ public class TokenParser {
      * @param cursor defines the bounds and current position of the buffer
      * @param delimiters set of delimiting characters. Can be {@code null} if the token
      *  is not delimited by any character.
+     *  @return parsed token
      */
     public String parseToken(final CharArrayBuffer buf, final ParserCursor cursor, final BitSet delimiters) {
         final StringBuilder dst = new StringBuilder();
@@ -112,6 +113,7 @@ public class TokenParser {
      * @param cursor defines the bounds and current position of the buffer
      * @param delimiters set of delimiting characters. Can be {@code null} if the value
      *  is not delimited by any character.
+     *  @return parsed value
      */
     public String parseValue(final CharArrayBuffer buf, final ParserCursor cursor, final BitSet delimiters) {
         final StringBuilder dst = new StringBuilder();

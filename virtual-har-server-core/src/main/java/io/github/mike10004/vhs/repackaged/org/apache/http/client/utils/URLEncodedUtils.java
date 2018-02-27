@@ -51,7 +51,7 @@ public class URLEncodedUtils {
     private URLEncodedUtils() {}
 
     /**
-     * Returns a list of {@link NameValuePair NameValuePairs} as built from the URI's query portion. For example, a URI
+     * Returns a list of {@code NameValuePair}s as built from the URI's query portion. For example, a URI
      * of {@code http://example.org/path/to/file?a=1&b=2&c=3} would return a list of three NameValuePairs, one for a=1,
      * one for b=2, and one for c=3. By convention, {@code '&'} and {@code ';'} are accepted as parameter separators.
      * <p>
@@ -63,7 +63,7 @@ public class URLEncodedUtils {
      *        URI to parse
      * @param charset
      *        Charset to use while parsing the query
-     * @return a list of {@link NameValuePair} as built from the URI's query portion.
+     * @return a list of {@code NameValuePair} as built from the URI's query portion.
      *
      * @since 4.5
      */
@@ -77,14 +77,14 @@ public class URLEncodedUtils {
     }
 
     /**
-     * Returns a list of {@link NameValuePair NameValuePairs} as parsed from the given string using the given character
+     * Returns a list of {@code NameValuePairs} as parsed from the given string using the given character
      * encoding. By convention, {@code '&'} and {@code ';'} are accepted as parameter separators.
      *
      * @param s
      *            text to parse.
      * @param charset
      *            Encoding to use when decoding the parameters.
-     * @return a list of {@link NameValuePair} as built from the URI's query portion.
+     * @return a list of {@code NameValuePair} as built from the URI's query portion.
      *
      * @since 4.2
      */
@@ -107,7 +107,7 @@ public class URLEncodedUtils {
     private static final String NAME_VALUE_SEPARATOR = "=";
 
     /**
-     * Returns a list of {@link NameValuePair NameValuePairs} as parsed from the given string using
+     * Returns a list of {@code NameValuePairs} as parsed from the given string using
      * the given character encoding.
      *
      * @param buf
@@ -116,7 +116,7 @@ public class URLEncodedUtils {
      *            Encoding to use when decoding the parameters.
      * @param separators
      *            element separators.
-     * @return a list of {@link NameValuePair} as built from the URI's query portion.
+     * @return a list of {@code NameValuePair} as built from the URI's query portion.
      *
      * @since 4.4
      */

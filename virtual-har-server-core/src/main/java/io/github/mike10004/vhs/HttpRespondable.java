@@ -33,6 +33,7 @@ public interface HttpRespondable {
      * Writes the response body to an output stream.
      * @param out an output stream
      * @return the content type (value for Content-Type header)
+     * @throws IOException if thrown by a stream-writing method
      */
     MediaType writeBody(OutputStream out) throws IOException;
 

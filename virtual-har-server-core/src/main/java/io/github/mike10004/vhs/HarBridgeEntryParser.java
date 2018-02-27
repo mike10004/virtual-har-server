@@ -59,6 +59,8 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
 
     /**
      * Creates a lowercase-keyed multimap from a list of headers.
+     * @param entryHeaders stream of headers as map entries
+     * @return a multimap containing all entries in the stream
      */
     protected Multimap<String, String> indexHeaders(Stream<? extends Entry<String, String>> entryHeaders) {
         return HttpRequests.indexHeaders(entryHeaders);
