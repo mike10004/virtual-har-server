@@ -6,6 +6,7 @@
 
     <groupId>com.github.mike10004</groupId>
     <artifactId>virtual-har-server</artifactId>
+    <name>virtual-har-server</name>
     <packaging>pom</packaging>
     <version>0.2</version>
     <description>API and library for an HTTP server that responds with content from a HAR</description>
