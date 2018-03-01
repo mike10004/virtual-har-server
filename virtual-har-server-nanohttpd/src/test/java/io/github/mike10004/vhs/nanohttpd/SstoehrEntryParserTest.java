@@ -8,7 +8,7 @@ import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 
-class SstoehrEntryParserTest extends EntryParserTestBase<HarEntry> {
+public class SstoehrEntryParserTest extends EntryParserTestBase<HarEntry> {
 
     @Override
     protected EntryParser<HarEntry> createParser() {

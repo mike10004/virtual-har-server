@@ -4,17 +4,17 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.Arrays;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class HeuristicEntryMatcherTest {
 
     @Test
-    void findTopEntry() throws Exception {
+    public void findTopEntry() throws Exception {
         BasicHeuristic heuristic = new BasicHeuristic();
         int threshold = BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE;
         String correctUrl = "http://example.com/page?foo=bar&baz=gaw";
@@ -29,11 +29,11 @@ public class HeuristicEntryMatcherTest {
         HeuristicEntryMatcher matcher = new HeuristicEntryMatcher(heuristic, threshold, Arrays.asList(entries));
         ParsedRequest request = Tests.createRequest("GET", correctUrl);
         HttpRespondable response = matcher.findTopEntry(request);
-        assertNotNull(response, "response");
+        assertNotNull("response", response);
         assertEquals(200, response.getStatus());
         assertEquals(1, response.streamHeaders().count());
         String content = Tests.readAsString(response);
-        assertEquals("good", content, "content");
+        assertEquals("content", "good", content);
     }
 
     protected ParsedEntry createEntry(String method, String url, int status, MediaType contentType, String bodyText) {

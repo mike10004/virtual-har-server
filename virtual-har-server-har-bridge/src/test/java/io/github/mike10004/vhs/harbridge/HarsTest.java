@@ -13,7 +13,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.mike10004.vhs.harbridge.Hars.ResponseContentTranslation;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
@@ -23,12 +23,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.Assert.assertEquals;
 
-class HarsTest {
+public class HarsTest {
 
     @Test
-    void isBase64Encoded() {
+    public void isBase64Encoded() {
         ImmutableMap.<Base64TestCase, Boolean>builder()
                 .put(new Base64TestCase("text/plain", "abc", null, 3L), false)
                 .put(new Base64TestCase("text/plain", "abc", null, null), false)
@@ -37,7 +37,7 @@ class HarsTest {
                 .put(new Base64TestCase("application/octet-stream", "abc", null, null), true)
                 .build().forEach((testCase, expected) -> {
             boolean actual = Hars.isBase64Encoded(testCase.contentType, testCase.text, testCase.encoding, testCase.size);
-            assertEquals(expected, actual, () -> "expected " + expected + " for " + testCase);
+            assertEquals("expected " + expected + " for " + testCase, expected, actual);
         });
     }
 
@@ -64,7 +64,7 @@ class HarsTest {
     }
 
     @Test
-    void testGzippedHtml() throws Exception {
+    public void testGzippedHtml() throws Exception {
         String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
         JsonObject response = new JsonParser().parse(json).getAsJsonObject();
         JsonObject content = response.getAsJsonObject("content");
@@ -79,7 +79,7 @@ class HarsTest {
                 null, null).body.read();
         byte[] decompressed = gunzip(data);
         String decompressedText = new String(decompressed, StandardCharsets.UTF_8);
-        assertEquals(text, decompressedText, "text");
+        assertEquals("text", text, decompressedText);
     }
 
     private static ParsedRequest buildRequest(@Nullable String acceptEncodingHeaderValue) {
@@ -108,11 +108,11 @@ class HarsTest {
     private void test_canServeOriginalResponseContentEncoding(boolean expected, String contentEncoding, String acceptEncoding) {
         List<String> contentEncodings = Hars.parseContentEncodings(contentEncoding);
         boolean actual = Hars.canServeOriginalResponseContentEncoding(contentEncodings, acceptEncoding);
-        assertEquals(expected, actual, String.format("expect %s for Content-Encoding: %s with Accept-Encoding: %s", expected, contentEncoding, acceptEncoding));
+        assertEquals(String.format("expect %s for Content-Encoding: %s with Accept-Encoding: %s", expected, contentEncoding, acceptEncoding), expected, actual);
     }
 
     @Test
-    void canServeOriginalResponseContentEncoding() {
+    public void canServeOriginalResponseContentEncoding() {
         test_canServeOriginalResponseContentEncoding(true, "gzip", "gzip");
         test_canServeOriginalResponseContentEncoding(true, "gzip", "deflate, gzip;q=1.0, *;q=0.5");
         test_canServeOriginalResponseContentEncoding(true, "gzip", "gzip, deflate, br");
@@ -131,7 +131,7 @@ class HarsTest {
     }
 
     @Test
-    void testResponseEncodedButAcceptEncodingDisallows() throws Exception {
+    public void testResponseEncodedButAcceptEncodingDisallows() throws Exception {
         String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
         JsonObject response = new JsonParser().parse(json).getAsJsonObject();
         JsonObject content = response.getAsJsonObject("content");
@@ -145,7 +145,7 @@ class HarsTest {
                 contentEncodingHeaderValue,
                 null, null);
         String responseText = result.body.asCharSource(StandardCharsets.UTF_8).read();
-        assertEquals(text, responseText, "text");
+        assertEquals("text", text, responseText);
 
     }
 }

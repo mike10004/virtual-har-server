@@ -32,9 +32,9 @@ import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import io.github.mike10004.vhs.nanohttpd.HarMaker.EntrySpec;
 import io.github.mike10004.vhs.testsupport.Tests;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -44,7 +44,6 @@ import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -61,11 +60,9 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertEquals;
 
-class ReplayingRequestHandlerTest {
+public class ReplayingRequestHandlerTest {
 
     private static final boolean debug = false;
 
@@ -95,8 +92,8 @@ class ReplayingRequestHandlerTest {
     }
 
     @Test
-    void serve() throws Exception {
-        File harFile = new File(getClass().getResource("/replay-test-1.har").toURI());
+    public void serve() throws Exception {
+        File harFile = Tests.getReplayTest1HarFile(FileUtils.getTempDirectory().toPath());
         if (debug) dumpHar(harFile);
         List<de.sstoehr.harreader.model.HarEntry> entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
         EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
@@ -135,13 +132,13 @@ class ReplayingRequestHandlerTest {
                 interactions.put(requestSpec, capturedResponse);
             }
         }
-        assertEquals(requestsToMake.size(), interactions.size(), "num interactions == num specs");
+        assertEquals("num interactions == num specs", requestsToMake.size(), interactions.size());
         interactions.forEach((request, response) -> {
             @Nullable EntrySpec entry = findEntrySpec(specs, request);
             if (entry != null) {
-                Assertions.assertEquals(entry.response.getStatus().getRequestStatus(), response.status, "response.status");
+                assertEquals("response.status", entry.response.getStatus().getRequestStatus(), response.status);
             } else {
-                Assertions.assertEquals(NOT_FOUND_CODE, response.status, "response.status for unspec'd request");
+                assertEquals("response.status for unspec'd request", NOT_FOUND_CODE, response.status);
             }
         });
     }
@@ -188,11 +185,6 @@ class ReplayingRequestHandlerTest {
             return Base64.getEncoder().encodeToString(capturedResponse.getContentAsBytes().read());
         }
     }
-
-//    static ByteSource toByteSource(HttpEntity entity) throws IOException {
-//        byte[] bytes = EntityUtils.toByteArray(entity);
-//        return ByteSource.wrap(bytes); // for debugging, so we can look at the bytes here
-//    }
 
     private static JsonPrimitive abbreviatePrimitive(JsonPrimitive primitive) {
         if (primitive.isString()) {

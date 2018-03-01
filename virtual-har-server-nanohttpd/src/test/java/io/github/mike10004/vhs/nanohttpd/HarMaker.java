@@ -30,7 +30,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -49,7 +49,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.Assert.assertEquals;
 
 public class HarMaker {
 
@@ -207,7 +207,7 @@ public class HarMaker {
 
     static class HarMakerTest {
         @Test
-        void makeHar() throws Exception {
+        public void makeHar() throws Exception {
             List<EntrySpec> specs = Arrays.asList(
                     new EntrySpec(RequestSpec.get(URI.create("http://example.com/one")), NanoResponse.status(200).plainTextUtf8("one")),
                     new EntrySpec(RequestSpec.get(URI.create("http://example.com/two")), NanoResponse.status(200).plainTextUtf8("two"))
@@ -224,7 +224,7 @@ public class HarMaker {
                     System.out.format("response consumed");
                 }
             });
-            assertEquals(specs.size(), har.getLog().getEntries().size(), "num entries");
+            assertEquals("num entries", specs.size(), har.getLog().getEntries().size());
             new GsonBuilder().setPrettyPrinting().create().toJson(har, System.out);
             System.out.println();
         }

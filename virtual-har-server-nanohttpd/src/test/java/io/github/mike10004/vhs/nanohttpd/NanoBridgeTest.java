@@ -5,7 +5,7 @@ import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.CookieHandler;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.Method;
 import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.ResponseException;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -13,24 +13,24 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
-class NanoBridgeTest {
+public class NanoBridgeTest {
 
     @Test
-    void getRequestUrl_get() {
+    public void getRequestUrl_get() {
         NanoBridge bridge = new NanoBridge();
         String url = "http://www.example.com/";
         String actual = bridge.getRequestUrl(new FakeSession(Method.GET, url));
-        assertEquals(url, actual, "url from GET session");
+        assertEquals("url from GET session", url, actual);
     }
 
     @Test
-    void getRequestUrl_connect() {
+    public void getRequestUrl_connect() {
         NanoBridge bridge = new NanoBridge();
         String url = "www.example.com:443";
         String actual = bridge.getRequestUrl(new FakeSession(Method.CONNECT, url));
-        assertEquals(url, actual, "url from CONNECT session");
+        assertEquals("url from CONNECT session", url, actual);
     }
 
     private static class FakeSession implements NanoHTTPD.IHTTPSession {

@@ -45,6 +45,11 @@
             <version>4.1</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>junit5-standin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
 </project>

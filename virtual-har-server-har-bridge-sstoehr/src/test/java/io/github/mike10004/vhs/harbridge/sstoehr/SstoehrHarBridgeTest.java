@@ -1,23 +1,24 @@
 package io.github.mike10004.vhs.harbridge.sstoehr;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimap;
 import com.google.common.net.MediaType;
-import de.sstoehr.harreader.model.*;
+import de.sstoehr.harreader.model.HarContent;
+import de.sstoehr.harreader.model.HarEntry;
+import de.sstoehr.harreader.model.HarRequest;
+import de.sstoehr.harreader.model.HarResponse;
+import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.harbridge.HarBridge;
-
 import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.net.URI;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
-class SstoehrHarBridgeTest {
+public class SstoehrHarBridgeTest {
 
     private HarBridge<HarEntry> bridge = new SstoehrHarBridge();
     private HarEntry entry;
@@ -27,8 +28,8 @@ class SstoehrHarBridgeTest {
     @SuppressWarnings("ConstantConditions")
     private byte[] responseBody = responseText.getBytes(contentType.charset().get());
 
-    @BeforeEach
-    private void thing() throws Exception {
+    @Before
+    public void thing() throws Exception {
         entry = new HarEntry();
         HarRequest request = new HarRequest();
         request.setMethod(HttpMethod.GET);
@@ -46,36 +47,36 @@ class SstoehrHarBridgeTest {
     }
 
     @Test
-    void getRequestMethod() throws Exception {
-        assertEquals(HttpMethod.GET.name(), bridge.getRequestMethod(entry), "method");
+    public void getRequestMethod() throws Exception {
+        assertEquals("method", HttpMethod.GET.name(), bridge.getRequestMethod(entry));
     }
 
     @Test
-    void getRequestUrl() throws Exception {
-        assertEquals(url.toString(), bridge.getRequestUrl(entry), "url");
+    public void getRequestUrl() throws Exception {
+        assertEquals("url", url.toString(), bridge.getRequestUrl(entry));
     }
 
     @Test
-    void getRequestHeaders() throws Exception {
-        assertEquals(0L, bridge.getRequestHeaders(entry).count(), "request header count");
+    public void getRequestHeaders() throws Exception {
+        assertEquals("request header count", 0L, bridge.getRequestHeaders(entry).count());
     }
 
     @Test
-    void getResponseData() throws Exception {
+    public void getResponseData() throws Exception {
         ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("http://www.example.com/"), ImmutableMultimap.of(), ImmutableMultimap.of(), null);
         ResponseData responseData = bridge.getResponseData(request, entry);
-        assertEquals(responseBody.length, responseData.body.size(), "body size");
+        assertEquals("body size", responseBody.length, responseData.body.size());
         assertEquals(contentType, responseData.contentType);
         assertEquals(0, responseData.headers.count());
     }
 
     @Test
-    void getRequestPostData() throws Exception {
+    public void getRequestPostData() throws Exception {
         assertNull(bridge.getRequestPostData(entry));
     }
 
     @Test
-    void getResponseStatus() throws Exception {
+    public void getResponseStatus() throws Exception {
         assertEquals(200, bridge.getResponseStatus(entry));
     }
 }

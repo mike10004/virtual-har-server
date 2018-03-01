@@ -17,7 +17,9 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.junit.jupiter.api.Test;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,10 +29,13 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public abstract class VirtualHarServerTestBase {
+
+    @Rule
+    public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException;
 
@@ -39,32 +44,28 @@ public abstract class VirtualHarServerTestBase {
             notFoundUri = URI.create("http://example.com/not-found");
 
     @Test
-    void basicTest() throws Exception {
-        Path temporaryDirectory = java.nio.file.Files.createTempDirectory("VirtualHarServerTest");
-        try {
-            File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
-            EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
-            int port = Tests.findOpenPort();
-            VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
-            Multimap<URI, ResponseSummary> responses;
-            List<URI> uris = Arrays.asList(
-                    oneUri, twoUri, notFoundUri
-            );
-            try (VirtualHarServerControl ctrl = server.start()) {
-                ApacheRecordingClient client = new ApacheRecordingClient(false);
-                responses = client.collectResponses(uris, ctrl.getSocketAddress());
-            }
-            examineResponses(uris, responses);
-        } finally {
-            TemporaryFolder.deleteDirectory(temporaryDirectory);
+    public void basicTest() throws Exception {
+        Path temporaryDirectory = temporaryFolder.newFolder().toPath();
+        File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
+        EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
+        int port = Tests.findOpenPort();
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
+        Multimap<URI, ResponseSummary> responses;
+        List<URI> uris = Arrays.asList(
+                oneUri, twoUri, notFoundUri
+        );
+        try (VirtualHarServerControl ctrl = server.start()) {
+            ApacheRecordingClient client = new ApacheRecordingClient(false);
+            responses = client.collectResponses(uris, ctrl.getSocketAddress());
         }
+        examineResponses(uris, responses);
     }
 
     protected void examineResponses(List<URI> attempted, Multimap<URI, ResponseSummary> responses) {
-        assertTrue(responses.keySet().containsAll(attempted), "attempted all urls");
+        assertTrue("attempted all urls", responses.keySet().containsAll(attempted));
         ResponseSummary oneResponse = responses.get(oneUri).iterator().next();
         System.out.format("'%s' fetched from %s%n", oneResponse.entity, oneUri);
-        assertEquals("one", oneResponse.entity, "response to " + oneUri);
+        assertEquals("response to " + oneUri, "one", oneResponse.entity);
     }
 
     private static class ApacheRecordingClient {
@@ -98,6 +99,7 @@ public abstract class VirtualHarServerTestBase {
                     HttpGet get = new HttpGet(transformUri(uri));
                     try (CloseableHttpResponse response = client.execute(get)) {
                         StatusLine statusLine = response.getStatusLine();
+                        System.out.format("received %s from %s%n", statusLine, uri);
                         String entity = EntityUtils.toString(response.getEntity());
                         result.put(uri, new ResponseSummary(statusLine, entity));
                     }

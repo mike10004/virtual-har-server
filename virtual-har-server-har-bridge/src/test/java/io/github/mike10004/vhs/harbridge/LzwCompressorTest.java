@@ -1,13 +1,13 @@
 package io.github.mike10004.vhs.harbridge;
 
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.Assert.assertEquals;
 
-class LzwCompressorTest {
+public class LzwCompressorTest {
 
     @Test
-    void compressAndDecompress() throws Exception {
+    public void compressAndDecompress() throws Exception {
         String data = "This is a low-entropy string. This is a low-entropy string. This is a low-entropy string. This is a low-entropy string.";
         byte[] inbytes = data.getBytes();
         System.out.format("%d input bytes%n", inbytes.length);
@@ -16,6 +16,6 @@ class LzwCompressorTest {
         byte[] decompressedBytes = new LzwCompressor().decompress(compressedBytes);
         System.out.format("%d decompressed bytes%n", decompressedBytes.length);
         String actual = new String(decompressedBytes);
-        assertEquals(data, actual, "string");
+        assertEquals("string", data, actual);
     }
 }

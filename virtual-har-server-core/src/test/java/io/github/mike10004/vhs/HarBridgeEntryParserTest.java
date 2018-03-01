@@ -10,7 +10,8 @@ import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
-import org.junit.jupiter.api.Test;
+import org.junit.Assume;
+import org.junit.Test;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -23,17 +24,19 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
-class HarBridgeEntryParserTest {
+public class HarBridgeEntryParserTest {
 
     @Test
-    void parseResponse() throws Exception {
-        org.junit.jupiter.api.Assumptions.assumeTrue(false, "not yet implemented");
+    public void parseResponse() throws Exception {
+        Assume.assumeTrue("not yet implemented", false);
     }
 
     @Test
-    void replaceContentLengthHeaderValue() throws Exception {
+    public void replaceContentLengthHeaderValue() throws Exception {
         String data = "hello, world";
         Charset charset = StandardCharsets.UTF_8;
         byte[] bytes = data.getBytes(charset);
@@ -48,34 +51,34 @@ class HarBridgeEntryParserTest {
         Map<String, Collection<String>> headers = headersMm.asMap();
         Collection<String> values = headers.get(HttpHeaders.CONTENT_LENGTH);
         System.out.format("%s: %s%n", HttpHeaders.CONTENT_LENGTH, values);
-        assertEquals(1, values.size(), "num values");
+        assertEquals("num values", 1, values.size());
         String finalContentLengthStr = values.iterator().next();
-        assertNotNull(finalContentLengthStr, "final content length header not found");
+        assertNotNull("final content length header not found", finalContentLengthStr);
         long finalContentLength = Long.parseLong(finalContentLengthStr);
-        assertEquals(bytes.length, finalContentLength, "content length");
+        assertEquals("content length", bytes.length, finalContentLength);
     }
 
     @Test
-    void parseGetRequest() throws IOException {
+    public void parseGetRequest() throws IOException {
         HarBridgeEntryParser<FakeHarEntry> parser = new HarBridgeEntryParser<>(new FakeHarBridge());
         URI url = URI.create("http://www.example.com/");
         FakeHarEntry something = FakeHarEntry.request("GET", url.toString());
         ParsedRequest request = parser.parseRequest(something);
-        assertEquals(HttpMethod.GET, request.method, "method");
-        assertEquals(url, request.url, "url");
+        assertEquals("method", HttpMethod.GET, request.method);
+        assertEquals("url", url, request.url);
     }
 
     @Test
-    void parseConnectRequest() throws Exception {
+    public void parseConnectRequest() throws Exception {
         HarBridgeEntryParser<FakeHarEntry> parser = new HarBridgeEntryParser<>(new FakeHarBridge());
         URI url = new URI(null, null, "www.example.com", 443, null, null, null);
         FakeHarEntry something = FakeHarEntry.request("CONNECT", "www.example.com:443");
         ParsedRequest request = parser.parseRequest(something);
-        assertEquals(HttpMethod.CONNECT, request.method, "method");
-        assertNull(request.url.getScheme(), "scheme null");
-        assertEquals(443, request.url.getPort(), "port 443");
-        assertEquals("www.example.com", request.url.getHost(), "host");
-        assertEquals(url, request.url, "url");
+        assertEquals("method", HttpMethod.CONNECT, request.method);
+        assertNull("scheme null", request.url.getScheme());
+        assertEquals("port 443", 443, request.url.getPort());
+        assertEquals("host", "www.example.com", request.url.getHost());
+        assertEquals("url", url, request.url);
     }
 
     private static class FakeHarBridge implements HarBridge<FakeHarEntry> {

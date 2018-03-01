@@ -7,7 +7,7 @@ import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
 import java.io.File;
 import java.io.IOException;
 
-class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
+public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
 
     @Override
     protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException {

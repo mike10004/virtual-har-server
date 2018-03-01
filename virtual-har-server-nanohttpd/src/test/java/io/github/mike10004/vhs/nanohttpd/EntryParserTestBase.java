@@ -3,13 +3,12 @@ package io.github.mike10004.vhs.nanohttpd;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.net.URI;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 abstract class EntryParserTestBase<E> {
 
@@ -18,15 +17,15 @@ abstract class EntryParserTestBase<E> {
     protected abstract E createEntryWithRequest(String method, String url, String...headers);
 
     @Test
-    void create() throws Exception {
+    public void create() throws Exception {
         String urlStr = "https://www.example.com/hello";
         E entry = createEntryWithRequest("GET", urlStr, "X-Something", "foo", "X-Something-Else", "bar");
         ParsedRequest parsed = createParser().parseRequest(entry);
-        Assertions.assertEquals(HttpMethod.GET, parsed.method, "method");
-        assertEquals(URI.create(urlStr), parsed.url, "url");
-        assertEquals(null, parsed.query, "query");
+        assertEquals("method", HttpMethod.GET, parsed.method);
+        assertEquals("url", URI.create(urlStr), parsed.url);
+        assertEquals("query", null, parsed.query);
         assertEquals(2, parsed.indexedHeaders.size());
-        assertEquals("foo", parsed.indexedHeaders.get("x-something").iterator().next(), "header value");
+        assertEquals("header value", "foo", parsed.indexedHeaders.get("x-something").iterator().next());
     }
 
 }

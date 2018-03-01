@@ -10,6 +10,7 @@ import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import net.lightbody.bmp.proxy.CaptureType;
 import org.apache.commons.io.FileUtils;
 import org.littleshoot.proxy.MitmManager;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -38,16 +39,16 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         }
         Path dirToDelete = java.nio.file.Files.createTempDirectory(config.scratchDir, "virtual-har-server-bmp");
         CertificateAndKeySource certificateAndKeySource = new AutoCertificateAndKeySource(dirToDelete);
-        BrowserMobProxy proxy = startProxy(certificateAndKeySource);
-        return new BrowsermobVhsControl(proxy, dirToDelete);
+        UpstreamBarrier upstreamBarrier = new UpstreamBarrier();
+        BrowserMobProxy proxy = startProxy(upstreamBarrier, certificateAndKeySource);
+        return new BrowsermobVhsControl(proxy, upstreamBarrier, dirToDelete);
     }
 
     private Supplier<BrowserMobProxy> localProxyInstantiator = BrowserMobProxyServer::new;
-    private Supplier<InetSocketAddress> upstreamProxyProvider = () -> null;
 
-    public BrowserMobProxy startProxy(CertificateAndKeySource certificateAndKeySource) {
+    public BrowserMobProxy startProxy(UpstreamBarrier upstreamBarrier, CertificateAndKeySource certificateAndKeySource) throws IOException {
         BrowserMobProxy bmp = instantiateProxy();
-        configureProxy(bmp, certificateAndKeySource);
+        configureProxy(bmp, upstreamBarrier, certificateAndKeySource);
         bmp.enableHarCaptureTypes(getCaptureTypes());
         bmp.newHar();
         bmp.start();
@@ -65,24 +66,24 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         return localProxyInstantiator.get();
     }
 
-    protected void configureProxy(BrowserMobProxy bmp, CertificateAndKeySource certificateAndKeySource) {
+    protected void configureProxy(BrowserMobProxy bmp, UpstreamBarrier upstreamBarrier, CertificateAndKeySource certificateAndKeySource) {
         if (certificateAndKeySource != null) {
             MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource);
             bmp.setMitmManager(mitmManager);
         }
-        @Nullable InetSocketAddress upstreamProxy = upstreamProxyProvider.get();
-        if (upstreamProxy != null) {
-            bmp.setChainedProxy(upstreamProxy);
-        }
+        InetSocketAddress upstreamProxy = new InetSocketAddress("127.0.0.1", upstreamBarrier.getPort());
+        bmp.setChainedProxy(upstreamProxy);
     }
 
     class BrowsermobVhsControl implements VirtualHarServerControl {
 
         private final BrowserMobProxy proxy;
+        private final UpstreamBarrier upstreamBarrier;
         private final Path dirToDelete;
 
-        BrowsermobVhsControl(BrowserMobProxy proxy, Path dirToDelete) {
+        BrowsermobVhsControl(BrowserMobProxy proxy, UpstreamBarrier upstreamBarrier, Path dirToDelete) {
             this.proxy = requireNonNull(proxy);
+            this.upstreamBarrier = requireNonNull(upstreamBarrier);
             this.dirToDelete = requireNonNull(dirToDelete);
         }
 
@@ -93,6 +94,11 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
 
         @Override
         public void close() throws IOException {
+            try {
+                upstreamBarrier.close();
+            } catch (IOException e) {
+                LoggerFactory.getLogger(BrowsermobVhsControl.class).warn("failed to close upstream barrier");
+            }
             proxy.stop();
             FileUtils.deleteDirectory(dirToDelete.toFile());
         }
