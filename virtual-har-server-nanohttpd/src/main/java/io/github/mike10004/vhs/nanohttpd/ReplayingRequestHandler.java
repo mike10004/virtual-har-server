@@ -8,6 +8,7 @@ import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HttpRespondable;
+import io.github.mike10004.vhs.ResponseInterceptor;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

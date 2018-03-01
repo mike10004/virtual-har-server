@@ -12,7 +12,6 @@ import org.apache.commons.io.FileUtils;
 import org.littleshoot.proxy.MitmManager;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -39,7 +38,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         }
         Path dirToDelete = java.nio.file.Files.createTempDirectory(config.scratchDir, "virtual-har-server-bmp");
         CertificateAndKeySource certificateAndKeySource = new AutoCertificateAndKeySource(dirToDelete);
-        UpstreamBarrier upstreamBarrier = new UpstreamBarrier();
+        UpstreamBarrier upstreamBarrier = new NanohttpdUpstreamBarrier();
         BrowserMobProxy proxy = startProxy(upstreamBarrier, certificateAndKeySource);
         return new BrowsermobVhsControl(proxy, upstreamBarrier, dirToDelete);
     }
@@ -71,7 +70,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
             MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource);
             bmp.setMitmManager(mitmManager);
         }
-        InetSocketAddress upstreamProxy = new InetSocketAddress("127.0.0.1", upstreamBarrier.getPort());
+        InetSocketAddress upstreamProxy = upstreamBarrier.getSocketAddress();
         bmp.setChainedProxy(upstreamProxy);
     }
 
