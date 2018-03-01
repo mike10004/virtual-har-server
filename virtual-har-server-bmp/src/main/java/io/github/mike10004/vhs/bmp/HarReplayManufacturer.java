@@ -14,18 +14,22 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
+import static java.util.Objects.requireNonNull;
+
 public class HarReplayManufacturer implements ResponseManufacturer {
 
     private static final Logger log = LoggerFactory.getLogger(HarReplayManufacturer.class);
 
-    private final EntryMatcher heuristic;
+    private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
     private final RequestParser requestParser;
+    private final Responder responder;
 
-    public HarReplayManufacturer(EntryMatcher heuristic, ImmutableList<ResponseInterceptor> responseInterceptors) {
-        this.heuristic = heuristic;
-        this.responseInterceptors = responseInterceptors;
+    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors) {
+        this.entryMatcher = requireNonNull(entryMatcher);
+        this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
         requestParser = new DefaultRequestParser();
+        this.responder = new DefaultResponder();
     }
 
     @Override
@@ -35,28 +39,17 @@ public class HarReplayManufacturer implements ResponseManufacturer {
             request = requestParser.parse(originalRequest, fullCapturedRequest);
         } catch (IOException e) {
             log.error("failed to read from incoming request", e);
-            return requestParsingFailed(originalRequest, fullCapturedRequest);
+            return responder.requestParsingFailed(originalRequest, fullCapturedRequest);
         }
-        @Nullable HttpRespondable bestEntry = heuristic.findTopEntry(request);
+        @Nullable HttpRespondable bestEntry = entryMatcher.findTopEntry(request);
         if (bestEntry != null) {
             for (ResponseInterceptor interceptor : responseInterceptors) {
                 bestEntry = interceptor.intercept(request, bestEntry);
             }
-            HttpResponse response = toResponse(bestEntry);
+            HttpResponse response = responder.toResponse(originalRequest, fullCapturedRequest, bestEntry);
             return response;
         }
-        return noResponseFound(originalRequest, fullCapturedRequest);
+        return responder.noResponseFound(originalRequest, fullCapturedRequest);
     }
 
-    protected HttpResponse requestParsingFailed(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    protected HttpResponse toResponse(HttpRespondable respondable) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    protected HttpResponse noResponseFound(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
 }

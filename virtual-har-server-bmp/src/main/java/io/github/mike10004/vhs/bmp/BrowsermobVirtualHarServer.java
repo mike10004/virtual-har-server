@@ -3,15 +3,21 @@ package io.github.mike10004.vhs.bmp;
 import com.google.common.net.HostAndPort;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.HttpRequest;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import net.lightbody.bmp.proxy.CaptureType;
 import org.apache.commons.io.FileUtils;
+import org.littleshoot.proxy.HttpFilters;
+import org.littleshoot.proxy.HttpFiltersSourceAdapter;
 import org.littleshoot.proxy.MitmManager;
+import org.littleshoot.proxy.impl.ProxyUtils;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -22,6 +28,8 @@ import java.util.function.Supplier;
 import static java.util.Objects.requireNonNull;
 
 public class BrowsermobVirtualHarServer implements VirtualHarServer {
+
+    private Supplier<BrowserMobProxy> localProxyInstantiator = BrowserMobProxyServer::new;
 
     private final BrowsermobVhsConfig config;
 
@@ -42,8 +50,6 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         BrowserMobProxy proxy = startProxy(upstreamBarrier, certificateAndKeySource);
         return new BrowsermobVhsControl(proxy, upstreamBarrier, dirToDelete);
     }
-
-    private Supplier<BrowserMobProxy> localProxyInstantiator = BrowserMobProxyServer::new;
 
     public BrowserMobProxy startProxy(UpstreamBarrier upstreamBarrier, CertificateAndKeySource certificateAndKeySource) throws IOException {
         BrowserMobProxy bmp = instantiateProxy();
@@ -66,10 +72,10 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
     }
 
     protected void configureProxy(BrowserMobProxy bmp, UpstreamBarrier upstreamBarrier, CertificateAndKeySource certificateAndKeySource) {
-        if (certificateAndKeySource != null) {
-            MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource);
-            bmp.setMitmManager(mitmManager);
-        }
+        MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource);
+        bmp.setMitmManager(mitmManager);
+        ResponseManufacturer responseManufacturer = config.createResponseManufacturer();
+        bmp.addFirstHttpFilterFactory(new MonitorFiltersSource(responseManufacturer));
         InetSocketAddress upstreamProxy = upstreamBarrier.getSocketAddress();
         bmp.setChainedProxy(upstreamProxy);
     }
@@ -107,6 +113,43 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
 
     protected Set<CaptureType> getCaptureTypes() {
         return ALL_CAPTURE_TYPES;
+    }
+
+    private static class MonitorFiltersSource extends HttpFiltersSourceAdapter {
+
+        private final ResponseManufacturer responseManufacturer;
+
+        public MonitorFiltersSource(ResponseManufacturer responseManufacturer) {
+            this.responseManufacturer = requireNonNull(responseManufacturer);
+        }
+
+        @Override
+        public HttpFilters filterRequest(HttpRequest originalRequest) {
+            return doFilterRequest(originalRequest, null);
+        }
+
+        @Override
+        public HttpFilters filterRequest(HttpRequest originalRequest, ChannelHandlerContext ctx) {
+            return doFilterRequest(originalRequest, ctx);
+        }
+
+        private HttpFilters doFilterRequest(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx) {
+            if (!ProxyUtils.isCONNECT(originalRequest)) {
+                return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer);
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        public int getMaximumRequestBufferSizeInBytes() {
+            return 0;
+        }
+
+        @Override
+        public int getMaximumResponseBufferSizeInBytes() {
+            return 0;
+        }
     }
 
 }

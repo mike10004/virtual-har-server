@@ -20,12 +20,14 @@ import org.littleshoot.proxy.impl.ProxyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -86,6 +88,8 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         this.responseManufacturer = requireNonNull(responseManufacturer);
     }
 
+    private transient final Object responseLock = new Object();
+    private volatile boolean responseSent;
     @Override
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
         // if a ServerResponseCaptureFilter is configured, delegate to it to collect the client request. if it is not
@@ -104,25 +108,44 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
             LastHttpContent lastHttpContent = (LastHttpContent) httpObject;
             captureTrailingHeaders(lastHttpContent, harRequest);
             captureRequestContent(requestCaptureFilter.getHttpRequest(), requestCaptureFilter.getFullRequestContents(), harRequest);
-            return produceResponse(capturedOriginalRequest, harRequest);
+        }
+        synchronized (responseLock) {
+            if (responseSent) {
+                throw new IllegalStateException("response already sent");
+            }
+            log.debug("producing response for {}", describe(httpObject));
+            responseSent = true;
+        }
+        HttpResponse response = produceResponse(capturedOriginalRequest, harRequest);
+        return response;
+    }
+
+    @Nullable
+    protected String describe(@Nullable HttpObject object) {
+        if (object != null) {
+            if (object instanceof HttpRequest) {
+                String uri = ((HttpRequest)object).getUri();
+                String method = ((HttpRequest)object).getMethod().name();
+                return String.format("%s %s", uri, method);
+            }
         }
         return null;
     }
 
     protected HttpResponse produceResponse(HttpRequest httpRequest, HarRequest harRequest) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return responseManufacturer.manufacture(httpRequest, harRequest);
     }
 
     @Override
     public HttpObject proxyToClientResponse(HttpObject httpObject) {
-        throw new UnreachableCallbackException();
+        return super.proxyToClientResponse(httpObject);
     }
 
     static class UnreachableCallbackException extends IllegalStateException {}
 
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
-        throw new UnreachableCallbackException();
+        return raiseUnreachable();
     }
 
     /**
@@ -230,28 +253,36 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
 
     @Override
     public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
-        throw new UnreachableCallbackException();
+        raiseUnreachable();
     }
 
     @Override
     public void proxyToServerRequestSending() {
+        raiseUnreachable();
+    }
+
+    @Nullable // never returns
+    private HttpObject raiseUnreachable() {
+        HttpRequest captured = capturedOriginalRequest;
+        checkState(captured != null);
+        log.error("should be unreachable: {} {}", captured.getMethod(), captured.getUri());
         throw new UnreachableCallbackException();
     }
 
     @Override
     public void proxyToServerResolutionFailed(String hostAndPort) {
-        throw new UnreachableCallbackException();
+        raiseUnreachable();
     }
 
 
     @Override
     public void proxyToServerConnectionFailed() {
-        throw new UnreachableCallbackException();
+        raiseUnreachable();
     }
 
     @Override
     public void serverToProxyResponseTimedOut() {
-        throw new UnreachableCallbackException();
+        raiseUnreachable();
     }
 
 }
