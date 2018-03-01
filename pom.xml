@@ -37,6 +37,8 @@
         <module>virtual-har-server-nanohttpd</module>
         <module>virtual-har-server-har-bridge</module>
         <module>virtual-har-server-har-bridge-sstoehr</module>
+        <module>virtual-har-server-bmp</module>
+        <module>virtual-har-server-test-support</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -216,19 +218,16 @@
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-api</artifactId>
                 <version>${junit-jupiter.version}</version>
-                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-params</artifactId>
                 <version>${junit-jupiter.version}</version>
-                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>net.lightbody.bmp</groupId>
                 <artifactId>browsermob-core</artifactId>
                 <version>2.1.5</version>
-                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>com.google.code.gson</groupId>
@@ -239,6 +238,11 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-text</artifactId>
                 <version>1.2</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.6</version>
             </dependency>
             <dependency>
                 <groupId>org.brotli</groupId>
