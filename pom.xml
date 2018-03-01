@@ -43,6 +43,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <junit-jupiter.version>5.1.0</junit-jupiter.version>
         <slf4j.version>1.7.25</slf4j.version>
+        <nanochamp.version>0.12</nanochamp.version>
     </properties>
     <distributionManagement>
         <snapshotRepository>
@@ -209,7 +210,7 @@
             <dependency>
                 <groupId>com.github.mike10004</groupId>
                 <artifactId>nanohttpd-server</artifactId>
-                <version>0.12</version>
+                <version>${nanochamp.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
@@ -243,6 +244,11 @@
                 <groupId>org.brotli</groupId>
                 <artifactId>dec</artifactId>
                 <version>0.1.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.6</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

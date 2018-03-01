@@ -3,6 +3,7 @@ package io.github.mike10004.vhs.harbridge;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -10,8 +11,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -73,13 +72,16 @@ public abstract class ParsedRequest {
             }
         }
 
+        @Override
         public InputStream openBodyStream() throws IOException {
             return bodySource.openStream();
         }
 
+        @Override
         public boolean isBodyPresent() {
             return bodyPresent;
         }
+
     }
 
     @Nullable
@@ -89,5 +91,18 @@ public abstract class ParsedRequest {
                 .filter(header -> headerName.equalsIgnoreCase(header.getKey()))
                 .map(Map.Entry::getValue)
                 .findFirst().orElse(null);
+    }
+
+    @Override
+    public String toString() {
+        int querySize = query == null ? -1 : query.size();
+        boolean bodyPresent = isBodyPresent();
+        return "ParsedRequest{" +
+                "method=" + method +
+                ", url=" + StringUtils.abbreviate(url.toString(), 128) +
+                ", query.size=" + querySize +
+                ", headers.size=" + indexedHeaders.size() +
+                ", hasBody=" + bodyPresent +
+                '}';
     }
 }
