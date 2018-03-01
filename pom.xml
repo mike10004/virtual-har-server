@@ -43,7 +43,6 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <junit-jupiter.version>5.1.0</junit-jupiter.version>
         <slf4j.version>1.7.25</slf4j.version>
         <nanochamp.version>0.12</nanochamp.version>
     </properties>
@@ -72,18 +71,6 @@
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>2.20.1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.platform</groupId>
-                            <artifactId>junit-platform-surefire-provider</artifactId>
-                            <version>1.1.0</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-engine</artifactId>
-                            <version>${junit-jupiter.version}</version>
-                        </dependency>
-                    </dependencies>
                     <configuration>
                         <systemPropertyVariables>
                             <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
@@ -215,16 +202,6 @@
                 <version>${nanochamp.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-api</artifactId>
-                <version>${junit-jupiter.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-params</artifactId>
-                <version>${junit-jupiter.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>net.lightbody.bmp</groupId>
                 <artifactId>browsermob-core</artifactId>
                 <version>2.1.5</version>
@@ -253,6 +230,11 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>3.6</version>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.12</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
