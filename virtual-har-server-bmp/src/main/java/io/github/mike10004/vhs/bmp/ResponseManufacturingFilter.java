@@ -31,32 +31,18 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Implementation of {@code HttpFilters} that sends a notification when an HTTP response
- * is received. This is still a pretty rough implementation, but it may suffice for
- * limited use cases at this stage. Don't expect the HTTP request/response objects
- * contained in the notification to be perfect representations.
+ * Filters implementation that short-circuits all requests.
  *
- * <p>Most of this code is copied from {@link net.lightbody.bmp.filters.HarCaptureFilter}.
- * The main difference is that the HAR filter keeps adding to the HAR object when
- * HTTP requests or responses are intercepted, but this implementation accumulates
- * (most of) the same data and packages it up in a notification when the request/response
- * interaction is completed. The interaction is considered completed when one of four methods
- * is invoked:
- * <ul>
- *     <li>{@link #serverToProxyResponse(HttpObject)} if everything goes normally,</li>
- *     <li>or one of the failure methods:
- *        <ul>
- *            <li>{@link #serverToProxyResponseTimedOut()}</li>
- *            <li>{@link #proxyToServerConnectionFailed()}</li>
- *            <li>{@link #proxyToServerResolutionFailed(String)}</li>
- *        </ul>
- *     </li>
- * </ul>
+ * <p>This is a modification of {@link net.lightbody.bmp.filters.HarCaptureFilter} that
+ * only captures the response and delegates to a {@link BmpResponseManufacturer} to
+ * produce a response.
  */
 public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(ResponseManufacturingFilter.class);
 
+    private transient final Object responseLock = new Object();
+    private volatile boolean responseSent;
     private final HarRequest harRequest = new HarRequest();
 
     /**
@@ -66,7 +52,7 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
      */
     private final ClientRequestCaptureFilter requestCaptureFilter;
 
-    private final ResponseManufacturer responseManufacturer;
+    private final BmpResponseManufacturer responseManufacturer;
 
     /**
      * The "real" original request, as captured by the {@link #clientToProxyRequest(io.netty.handler.codec.http.HttpObject)} method.
@@ -79,21 +65,21 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
      * @param ctx channel handler context
      * @throws IllegalArgumentException if request method is {@code CONNECT}
      */
-    public ResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, ResponseManufacturer responseManufacturer) {
+    public ResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer) {
         super(originalRequest, ctx);
         if (ProxyUtils.isCONNECT(originalRequest)) {
-            throw new IllegalArgumentException("Attempted traffic listener capture for HTTP CONNECT request");
+            throw new IllegalArgumentException("HTTP CONNECT requests not supported by these filters");
         }
         requestCaptureFilter = new ClientRequestCaptureFilter(originalRequest);
         this.responseManufacturer = requireNonNull(responseManufacturer);
     }
 
-    private transient final Object responseLock = new Object();
-    private volatile boolean responseSent;
     @Override
     public HttpResponse clientToProxyRequest(HttpObject httpObject) {
-        // if a ServerResponseCaptureFilter is configured, delegate to it to collect the client request. if it is not
-        // configured, we still need to capture basic information (timings, possibly client headers, etc.), just not content.
+        return interceptRequest(httpObject);
+    }
+
+    protected HttpResponse interceptRequest(HttpObject httpObject) {
         requestCaptureFilter.clientToProxyRequest(httpObject);
         if (httpObject instanceof HttpRequest) {
             HttpRequest httpRequest = (HttpRequest) httpObject;
@@ -110,9 +96,7 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
             captureRequestContent(requestCaptureFilter.getHttpRequest(), requestCaptureFilter.getFullRequestContents(), harRequest);
         }
         synchronized (responseLock) {
-            if (responseSent) {
-                throw new IllegalStateException("response already sent");
-            }
+            checkState(!responseSent, "response already sent");
             log.debug("producing response for {}", describe(httpObject));
             responseSent = true;
         }
@@ -121,7 +105,7 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     }
 
     @Nullable
-    protected String describe(@Nullable HttpObject object) {
+    private static String describe(@Nullable HttpObject object) {
         if (object != null) {
             if (object instanceof HttpRequest) {
                 String uri = ((HttpRequest)object).getUri();
@@ -137,15 +121,8 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     }
 
     @Override
-    public HttpObject proxyToClientResponse(HttpObject httpObject) {
+    public final HttpObject proxyToClientResponse(HttpObject httpObject) {
         return super.proxyToClientResponse(httpObject);
-    }
-
-    static class UnreachableCallbackException extends IllegalStateException {}
-
-    @Override
-    public HttpObject serverToProxyResponse(HttpObject httpObject) {
-        return raiseUnreachable();
     }
 
     /**
@@ -251,6 +228,28 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         }
     }
 
+    /**
+     * Exception thrown by methods that should not be reached because a response
+     * should have been returned earlier. This comprises any method invoked between the
+     * proxy and the remote server.
+     */
+    static class UnreachableCallbackException extends IllegalStateException {}
+
+    private void raiseUnreachable() {
+        HttpRequest captured = capturedOriginalRequest;
+        if (captured != null) {
+            log.error("should be unreachable: {} {}", captured.getMethod(), captured.getUri());
+        } else {
+            log.error("should be unreachable; no request captured");
+        }
+    }
+
+    @Override
+    public HttpObject serverToProxyResponse(HttpObject httpObject) {
+        raiseUnreachable();
+        return httpObject;
+    }
+
     @Override
     public void proxyToServerResolutionSucceeded(String serverHostAndPort, InetSocketAddress resolvedRemoteAddress) {
         raiseUnreachable();
@@ -259,14 +258,6 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     @Override
     public void proxyToServerRequestSending() {
         raiseUnreachable();
-    }
-
-    @Nullable // never returns
-    private HttpObject raiseUnreachable() {
-        HttpRequest captured = capturedOriginalRequest;
-        checkState(captured != null);
-        log.error("should be unreachable: {} {}", captured.getMethod(), captured.getUri());
-        throw new UnreachableCallbackException();
     }
 
     @Override
@@ -282,6 +273,53 @@ public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
 
     @Override
     public void serverToProxyResponseTimedOut() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public HttpResponse proxyToServerRequest(HttpObject httpObject) {
+        raiseUnreachable();
+        return null;
+    }
+
+    @Override
+    public void proxyToServerRequestSent() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public void serverToProxyResponseReceiving() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public void serverToProxyResponseReceived() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public void proxyToServerConnectionQueued() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public InetSocketAddress proxyToServerResolutionStarted(String resolvingServerHostAndPort) {
+        raiseUnreachable();
+        return super.proxyToServerResolutionStarted(resolvingServerHostAndPort);
+    }
+
+    @Override
+    public void proxyToServerConnectionStarted() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public void proxyToServerConnectionSSLHandshakeStarted() {
+        raiseUnreachable();
+    }
+
+    @Override
+    public void proxyToServerConnectionSucceeded(ChannelHandlerContext serverCtx) {
         raiseUnreachable();
     }
 

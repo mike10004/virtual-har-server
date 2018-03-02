@@ -6,7 +6,7 @@ import net.lightbody.bmp.core.har.HarRequest;
 
 import java.io.IOException;
 
-public interface RequestParser {
+public interface BmpRequestParser {
 
     ParsedRequest parse(HttpRequest originalRequest, HarRequest fullCapturedRequest) throws IOException;
 

@@ -77,4 +77,5 @@ class DefaultResponder implements Responder {
     protected HttpResponse responseConstructionFailed(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
         return construct(originalRequest, HttpResponseStatus.INTERNAL_SERVER_ERROR, MediaType.OCTET_STREAM, new byte[0]);
     }
+
 }

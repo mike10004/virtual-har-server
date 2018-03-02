@@ -1,54 +1,24 @@
 package io.github.mike10004.vhs.bmp;
 
-import fi.iki.elonen.NanoHTTPD;
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import fi.iki.elonen.NanoHTTPD.Response;
-import fi.iki.elonen.NanoHTTPD.Response.Status;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLServerSocketFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 
-public class NanohttpdUpstreamBarrier implements UpstreamBarrier {
+public class NanohttpdUpstreamBarrier extends TlsNanoServer implements UpstreamBarrier {
 
-    private final NanoHTTPD server;
+    private static final Logger log = LoggerFactory.getLogger(NanohttpdUpstreamBarrier.class);
 
-    public NanohttpdUpstreamBarrier() throws IOException {
-        this.server = new BarrierServer(findOpenPort());
-        server.start();
+    public NanohttpdUpstreamBarrier(@Nullable SSLServerSocketFactory sslServerSocketFactory) throws IOException {
+        super(sslServerSocketFactory);
     }
 
     @Override
     public InetSocketAddress getSocketAddress() {
-        return new InetSocketAddress("127.0.0.1", server.getListeningPort());
+        return new InetSocketAddress("127.0.0.1", getListeningPort());
     }
 
-    @Override
-    public void close() throws IOException {
-        server.stop();
-    }
-
-    private static int findOpenPort() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
-        }
-    }
-
-    protected Response respond(IHTTPSession session) {
-        return NanoHTTPD.newFixedLengthResponse(Status.INTERNAL_ERROR, "application/octet-stream", new ByteArrayInputStream(new byte[0]), 0);
-    }
-
-    private class BarrierServer extends NanoHTTPD {
-
-        public BarrierServer(int port) {
-            super(port);
-
-        }
-
-        @Override
-        public Response serve(IHTTPSession session) {
-            return respond(session);
-        }
-    }
 }

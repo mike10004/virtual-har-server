@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 
-public class DefaultRequestParser implements RequestParser {
+public class DefaultRequestParser implements BmpRequestParser {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultRequestParser.class);
 

@@ -6,10 +6,21 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocketFactory;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.Base64;
 import java.util.Random;
 
@@ -64,4 +75,26 @@ public class KeystoreGenerator {
             FileUtils.forceDelete(keystoreFile);
         }
     }
+
+    public static SSLServerSocketFactory createTlsServerSocketFactory(KeyStore keystore, char[] keystorePassword) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
+        String keyManagerAlgorithm = KeyManagerFactory.getDefaultAlgorithm();
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(keyManagerAlgorithm);
+        keyManagerFactory.init(keystore, keystorePassword);
+        SSLContext sc = SSLContext.getInstance("TLS");
+        sc.init(keyManagerFactory.getKeyManagers(), null, null);
+        return sc.getServerSocketFactory();
+    }
+
+    public static KeyStore loadKeystore(GeneratedKeystore generatedKeystore) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
+        return loadKeystore(generatedKeystore.keystoreBytes, generatedKeystore.keystorePassword);
+    }
+
+    public static KeyStore loadKeystore(byte[] keystoreBytes, char[] keystorePassword) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
+        KeyStore keystore = KeyStore.getInstance("JKS");
+        try (InputStream stream = new ByteArrayInputStream(keystoreBytes)) {
+            keystore.load(stream, keystorePassword);
+        }
+        return keystore;
+    }
+
 }
