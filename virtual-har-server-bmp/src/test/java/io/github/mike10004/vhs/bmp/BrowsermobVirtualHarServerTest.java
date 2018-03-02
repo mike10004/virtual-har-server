@@ -74,11 +74,14 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     @Test
     @Override
     public void httpsTest() throws Exception {
-        super.httpsTest();
-        System.out.format("%s requests handled%n", requests.size());
-        requests.cellSet().forEach(cell -> {
-            System.out.format("%s %s %s%n", cell.getRowKey(), cell.getColumnKey(), cell.getValue());
-        });
+        try {
+            super.httpsTest();
+        } finally {
+            System.out.format("%s requests handled%n", requests.size());
+            requests.cellSet().forEach(cell -> {
+                System.out.format("%s %s %s%n", cell.getRowKey(), cell.getColumnKey(), cell.getValue());
+            });
+        }
     }
 
     private static class LoggingUpstreamBarrierFactory extends DefaultUpstreamBarrierFactory {

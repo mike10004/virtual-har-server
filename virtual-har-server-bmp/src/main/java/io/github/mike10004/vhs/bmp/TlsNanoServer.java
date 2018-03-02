@@ -73,6 +73,9 @@ public class TlsNanoServer implements Closeable {
             return super.getServerSocketFactory();
         }
 
-
+        @Override
+        protected boolean useGzipWhenAccepted(Response r) {
+            return false;
+        }
     }
 }

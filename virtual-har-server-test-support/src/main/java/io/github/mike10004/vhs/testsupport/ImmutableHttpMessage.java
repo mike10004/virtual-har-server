@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.testsupport;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ArrayListMultimap;

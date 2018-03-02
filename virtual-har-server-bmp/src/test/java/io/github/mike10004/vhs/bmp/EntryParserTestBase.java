@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.bmp;
 
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
@@ -8,7 +8,6 @@ import org.junit.Test;
 import java.net.URI;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 abstract class EntryParserTestBase<E> {
 

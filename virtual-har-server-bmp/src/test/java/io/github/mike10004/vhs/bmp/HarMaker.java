@@ -1,14 +1,9 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.gson.GsonBuilder;
-import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD;
-import io.github.mike10004.nanochamp.server.NanoControl;
-import io.github.mike10004.nanochamp.server.NanoResponse;
-import io.github.mike10004.nanochamp.server.NanoServer;
-import io.github.mike10004.nanochamp.server.NanoServer.ResponseProvider;
-import io.github.mike10004.nanochamp.server.NanoServer.ServiceRequest;
+import fi.iki.elonen.NanoHTTPD;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.core.har.Har;
@@ -121,12 +116,12 @@ public class HarMaker {
         specs.forEach(spec -> {
             specsWithIds.put(UUID.randomUUID(), spec);
         });
-        NanoServer server = NanoServer.builder().handle(new ResponseProvider() {
-            @Nullable
+        int port = 59876;
+        NanoHTTPD nanoserver = new NanoHTTPD(port) {
             @Override
-            public NanoHTTPD.Response serve(ServiceRequest request) {
-                System.out.format("starting to serve in response to request %s %s%n", request.method, request.uri);
-                String id = request.headers.apply(HEADER_ID);
+            public Response serve(IHTTPSession session) {
+                System.out.format("starting to serve in response to request %s %s%n", session.getMethod(), session.getUri());
+                String id = session.getHeaders().get(HEADER_ID);
                 checkArgument(id != null, "expect every request to have %s header", HEADER_ID);
                 EntrySpec spec = specsWithIds.get(UUID.fromString(id));
                 checkState(spec != null, "no spec for id %s", id);
@@ -134,21 +129,25 @@ public class HarMaker {
                 return spec.response;
             }
 
-        })
-                .httpdFactory(new UnadulteratedNanoHttpdFactory())
-                .build();
+            @Override
+            protected boolean useGzipWhenAccepted(Response r) {
+                return false;
+            }
+        };
         BrowserMobProxy proxy = new BrowserMobProxyServer();
         proxy.enableHarCaptureTypes(EnumSet.allOf(CaptureType.class));
         proxy.newHar();
         proxy.start();
         try {
-            try (NanoControl control = server.startServer()) {
+            nanoserver.start();
+            HostAndPort nanoSocketAddress = HostAndPort.fromParts("localhost", nanoserver.getListeningPort());
+            try {
                 try (CloseableHttpClient client = HttpClients.custom()
                         .setProxy(new HttpHost("localhost", proxy.getPort()))
                         .build()) {
                     for (Map.Entry<UUID, EntrySpec> specWithId : specsWithIds.entrySet()) {
                         EntrySpec spec = specWithId.getValue();
-                        HttpUriRequest httpUriRequest = spec.toHttpUriRequest(control.getSocketAddress(), specWithId.getKey());
+                        HttpUriRequest httpUriRequest = spec.toHttpUriRequest(nanoSocketAddress, specWithId.getKey());
                         try (CloseableHttpResponse response = client.execute(httpUriRequest)) {
                             callback.requestSent(spec.request);
                             EntityUtils.consume(response.getEntity());
@@ -157,6 +156,8 @@ public class HarMaker {
                         Uninterruptibles.sleepUninterruptibly(spec.postResponseDelay.toMillis(), TimeUnit.MILLISECONDS);
                     }
                 }
+            } finally {
+                nanoserver.stop();
             }
         } finally {
             proxy.stop();
@@ -205,28 +206,4 @@ public class HarMaker {
         }
     }
 
-    static class HarMakerTest {
-        @Test
-        public void makeHar() throws Exception {
-            List<EntrySpec> specs = Arrays.asList(
-                    new EntrySpec(RequestSpec.get(URI.create("http://example.com/one")), NanoResponse.status(200).plainTextUtf8("one")),
-                    new EntrySpec(RequestSpec.get(URI.create("http://example.com/two")), NanoResponse.status(200).plainTextUtf8("two"))
-            );
-            HarMaker maker = new HarMaker();
-            Har har = maker.produceHar(specs, new HttpCallback() {
-                @Override
-                public void requestSent(RequestSpec requestSpec) {
-                    System.out.format("request sent: %s %s%n", requestSpec.method, requestSpec.url);
-                }
-
-                @Override
-                public void responseConsumed() {
-                    System.out.format("response consumed");
-                }
-            });
-            assertEquals("num entries", specs.size(), har.getLog().getEntries().size());
-            new GsonBuilder().setPrettyPrinting().create().toJson(har, System.out);
-            System.out.println();
-        }
-    }
 }

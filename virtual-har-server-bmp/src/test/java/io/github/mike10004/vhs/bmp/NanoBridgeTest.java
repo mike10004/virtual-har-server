@@ -1,10 +1,10 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.bmp;
 
 import com.google.common.collect.ImmutableMap;
-import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD;
-import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.CookieHandler;
-import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.Method;
-import io.github.mike10004.nanochamp.repackaged.fi.iki.elonen.NanoHTTPD.ResponseException;
+import fi.iki.elonen.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD.CookieHandler;
+import fi.iki.elonen.NanoHTTPD.Method;
+import fi.iki.elonen.NanoHTTPD.ResponseException;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class NanoBridgeTest {
 

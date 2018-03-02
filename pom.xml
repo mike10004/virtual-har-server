@@ -34,7 +34,6 @@
     </scm>
     <modules>
         <module>virtual-har-server-core</module>
-        <module>virtual-har-server-nanohttpd</module>
         <module>virtual-har-server-har-bridge</module>
         <module>virtual-har-server-har-bridge-sstoehr</module>
         <module>virtual-har-server-bmp</module>

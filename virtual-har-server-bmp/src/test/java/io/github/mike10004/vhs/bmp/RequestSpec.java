@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.bmp;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;

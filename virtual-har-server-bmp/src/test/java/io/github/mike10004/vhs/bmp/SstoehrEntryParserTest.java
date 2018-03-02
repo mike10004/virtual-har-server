@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs.nanohttpd;
+package io.github.mike10004.vhs.bmp;
 
 import de.sstoehr.harreader.model.HarEntry;
 import de.sstoehr.harreader.model.HarHeader;
