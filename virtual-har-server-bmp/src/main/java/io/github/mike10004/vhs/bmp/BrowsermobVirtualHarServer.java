@@ -55,7 +55,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         Path scratchPath = scratch.getRoot();
         try {
             certificateAndKeySource = config.certificateAndKeySourceFactory.produce(config, scratchPath);
-            TlsNanoServer httpsInterceptionServer = createTlsEnabledNanoServer(config.nanoResponseManufacturer);
+            TlsNanoServer httpsInterceptionServer = config.tlsNanoServerFactory.produce(config, scratchPath, config.nanoResponseManufacturer);
             closeables.add(httpsInterceptionServer);
             proxy = startProxy(config.bmpResponseManufacturer, HostAndPort.fromParts("localhost", httpsInterceptionServer.getListeningPort()), certificateAndKeySource);
         } catch (RuntimeException | IOException e) {
@@ -63,24 +63,6 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
             throw e;
         }
         return new BrowsermobVhsControl(proxy, closeables);
-    }
-
-    private static TlsNanoServer createTlsEnabledNanoServer(NanoResponseManufacturer responseManufacturer) throws IOException {
-            try {
-                KeystoreGenerator kgen = new KeystoreGenerator();
-                GeneratedKeystore generatedKeystore = kgen.generate();
-                KeyStore keystore = KeystoreGenerator.loadKeystore(generatedKeystore);
-                SSLServerSocketFactory sslServerSocketFactory = KeystoreGenerator.createTlsServerSocketFactory(keystore, generatedKeystore.keystorePassword);
-                return new TlsNanoServer(sslServerSocketFactory) {
-                    @Nullable
-                    @Override
-                    protected Response respond(IHTTPSession session) {
-                        return responseManufacturer.manufacture(session);
-                    }
-                };
-            } catch (GeneralSecurityException e) {
-                throw new RuntimeException(e);
-            }
     }
 
     private static void closeAll(Iterable<? extends Closeable> closeables, @SuppressWarnings("SameParameterValue") boolean swallowIOException) {
