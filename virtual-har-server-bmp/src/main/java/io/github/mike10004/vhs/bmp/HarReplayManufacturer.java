@@ -1,13 +1,12 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.CharSource;
 import com.google.common.net.MediaType;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import fi.iki.elonen.NanoHTTPD.Response.Status;
+import fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.EntryMatcher;
-import io.github.mike10004.vhs.EntryParser;
-import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HttpRespondable;
 import io.github.mike10004.vhs.ResponseInterceptor;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
@@ -18,9 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import static java.util.Objects.requireNonNull;
 
@@ -30,87 +29,72 @@ public class HarReplayManufacturer implements BmpResponseManufacturer, NanoRespo
 
     private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
-    private final BmpRequestParser requestParser;
-    private final EntryParser<IHTTPSession> nanoRequestParser;
-    private final Responder responder;
+    private final HttpAssistant<BmpRequest, HttpResponse> bmpAssistant;
+    private final HttpAssistant<NanoHTTPD.IHTTPSession, NanoHTTPD.Response> nanoAssistant;
 
     public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors) {
+        this(entryMatcher, responseInterceptors, new BmpHttpAssistant(), new NanoHttpAssistant());
+    }
+
+    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, HttpAssistant<BmpRequest, HttpResponse> bmpAssistant, HttpAssistant<IHTTPSession, Response> nanoAssistant) {
         this.entryMatcher = requireNonNull(entryMatcher);
         this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
-        requestParser = new DefaultRequestParser();
-        this.responder = new DefaultResponder();
-        nanoRequestParser = new HarBridgeEntryParser<>(new NanoBridge());
+        this.bmpAssistant = requireNonNull(bmpAssistant);
+        this.nanoAssistant = requireNonNull(nanoAssistant);
     }
 
     @Override
     public HttpResponse manufacture(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
-        ParsedRequest request;
-        try {
-            request = requestParser.parse(originalRequest, fullCapturedRequest);
-        } catch (IOException e) {
-            log.error("failed to read from incoming request", e);
-            return responder.requestParsingFailed(originalRequest, fullCapturedRequest);
-        }
-        HttpRespondable bestEntry = manufacture(request);
-        if (bestEntry == null) {
-            return responder.noResponseFound(originalRequest, fullCapturedRequest);
-        } else {
-            return responder.toResponse(originalRequest, fullCapturedRequest, bestEntry);
-        }
+        BmpRequest bmpRequest = BmpRequest.of(originalRequest, fullCapturedRequest);
+        return manufacture(bmpAssistant, bmpRequest);
     }
 
-    @Nullable
-    protected HttpRespondable manufacture(ParsedRequest request) {
+    private static final Charset OUTGOING_CHARSET = StandardCharsets.UTF_8;
+
+    protected ImmutableHttpResponse createNotFoundResponse() {
+        MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withCharset(OUTGOING_CHARSET);
+        return ImmutableHttpResponse.builder(404)
+                .content(contentType, CharSource.wrap("404 Not Found").asByteSource(OUTGOING_CHARSET))
+                .build();
+    }
+
+    protected ImmutableHttpResponse createParsingFailedResponse() {
+        MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withCharset(OUTGOING_CHARSET);
+        return ImmutableHttpResponse.builder(500)
+                .content(contentType, CharSource.wrap("500 Internal Server Error").asByteSource(OUTGOING_CHARSET))
+                .build();
+    }
+
+    protected <Q, S> S manufacture(HttpAssistant<Q, S> assistant, Q incoming) {
+        ParsedRequest request;
+        try {
+            request = assistant.parseRequest(incoming);
+        } catch (IOException e) {
+            log.error("failed to read from incoming request", e);
+            ImmutableHttpResponse outgoing = createParsingFailedResponse();
+            return assistant.constructResponse(incoming, outgoing);
+        }
         @Nullable HttpRespondable bestEntry = entryMatcher.findTopEntry(request);
         if (bestEntry != null) {
             for (ResponseInterceptor interceptor : responseInterceptors) {
                 bestEntry = interceptor.intercept(request, bestEntry);
             }
         }
-        return bestEntry;
+        if (bestEntry == null) {
+            return assistant.constructResponse(incoming, createNotFoundResponse());
+        } else {
+            try {
+                return assistant.transformRespondable(incoming, bestEntry);
+            } catch (IOException e) {
+                log.warn("failed to construct response", e);
+                return assistant.constructResponse(incoming, HttpAssistant.standardServerErrorResponse());
+            }
+        }
     }
 
     @Override
     public NanoHTTPD.Response manufacture(IHTTPSession session) {
-        ParsedRequest request;
-        try {
-            request = nanoRequestParser.parseRequest(session);
-        } catch (IOException e) {
-            log.warn("failed to parsed request", e);
-            return createNanoErrorResponse();
-        }
-        HttpRespondable respondable = manufacture(request);
-        if (respondable != null) {
-            return createNanoResponse(respondable);
-        } else {
-            return creatNanoNotFoundResponse();
-        }
+        return manufacture(nanoAssistant, session);
     }
 
-    protected NanoHTTPD.Response createNanoResponse(HttpRespondable response) {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream(256); // TODO set size from Content-Length header if present
-        MediaType contentType;
-        try {
-            contentType = response.writeBody(baos);
-        } catch (IOException e) {
-            LoggerFactory.getLogger(NanoResponseManufacturer.class).error("could not buffer HTTP response data", e);
-            return createNanoErrorResponse();
-        }
-        byte[] responseBody = baos.toByteArray();
-        NanoHTTPD.Response.IStatus status = NanoHTTPD.Response.Status.lookup(response.getStatus());
-        String mimeType = contentType.toString();
-        NanoHTTPD.Response nanoResponse = NanoHTTPD.newFixedLengthResponse(status, mimeType, new ByteArrayInputStream(responseBody), responseBody.length);
-        response.streamHeaders().forEach(header -> {
-            nanoResponse.addHeader(header.getKey(), header.getValue());
-        });
-        return nanoResponse;
-    }
-
-    protected NanoHTTPD.Response createNanoErrorResponse() {
-        return NanoHTTPD.newFixedLengthResponse(Status.INTERNAL_ERROR, "text/plain", "500 Internal Server Error");
-    }
-
-    protected NanoHTTPD.Response creatNanoNotFoundResponse() {
-        return NanoHTTPD.newFixedLengthResponse(Status.NOT_FOUND, "text/plain", "404 Not Found");
-    }
 }

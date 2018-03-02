@@ -1,4 +1,4 @@
-package io.github.mike10004.vhs.testsupport;
+package io.github.mike10004.vhs.bmp;
 
 public class ImmutableHttpResponse extends ImmutableHttpMessage {
 

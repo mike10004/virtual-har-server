@@ -37,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  * only captures the response and delegates to a {@link BmpResponseManufacturer} to
  * produce a response.
  */
-public class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
+class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(ResponseManufacturingFilter.class);
 
