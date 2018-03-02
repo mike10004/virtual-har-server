@@ -13,20 +13,29 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContexts;
+import org.apache.http.ssl.TrustStrategy;
 import org.apache.http.util.EntityUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -61,6 +70,24 @@ public abstract class VirtualHarServerTestBase {
         examineResponses(uris, responses);
     }
 
+    @Test
+    public void httpsTest() throws Exception {
+        Path temporaryDirectory = temporaryFolder.newFolder().toPath();
+        File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
+        EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
+        int port = Tests.findOpenPort();
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
+        URI uri = URI.create("https://www.example.com/");
+        Multimap<URI, ResponseSummary> responses;
+        try (VirtualHarServerControl ctrl = server.start()) {
+            ApacheRecordingClient client = new TrustingClient();
+            responses = client.collectResponses(Collections.singleton(uri), ctrl.getSocketAddress());
+        }
+        assertEquals("num responses", 1, responses.size());
+        ResponseSummary summary = responses.values().iterator().next();
+        assertTrue("contains correct title", summary.entity.contains("Example Domain over HTTPS"));
+    }
+
     protected void examineResponses(List<URI> attempted, Multimap<URI, ResponseSummary> responses) {
         assertTrue("attempted all urls", responses.keySet().containsAll(attempted));
         ResponseSummary oneResponse = responses.get(oneUri).iterator().next();
@@ -68,11 +95,11 @@ public abstract class VirtualHarServerTestBase {
         assertEquals("response to " + oneUri, "one", oneResponse.entity);
     }
 
-    private static class ApacheRecordingClient {
+    protected static class ApacheRecordingClient {
 
         private final boolean transformHttpsToHttp;
 
-        ApacheRecordingClient(boolean transformHttpsToHttp) {
+        public ApacheRecordingClient(boolean transformHttpsToHttp) {
             this.transformHttpsToHttp = transformHttpsToHttp;
         }
 
@@ -88,12 +115,16 @@ public abstract class VirtualHarServerTestBase {
             }
         }
 
+        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) {
+            b.setProxy(new HttpHost(proxy.getHost(), proxy.getPort()));
+            b.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false));
+        }
+
         public Multimap<URI, ResponseSummary> collectResponses(Iterable<URI> urisToGet, HostAndPort proxy) throws Exception {
             Multimap<URI, ResponseSummary> result = ArrayListMultimap.create();
-            try (CloseableHttpClient client = HttpClients.custom()
-                    .setProxy(new HttpHost(proxy.getHost(), proxy.getPort()))
-                    .setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
-                    .build()) {
+            HttpClientBuilder clientBuilder = HttpClients.custom();
+            configureHttpClientBuilder(clientBuilder, proxy);
+            try (CloseableHttpClient client = clientBuilder.build()) {
                 for (URI uri : urisToGet) {
                     System.out.format("fetching %s%n", uri);
                     HttpGet get = new HttpGet(transformUri(uri));
@@ -109,7 +140,7 @@ public abstract class VirtualHarServerTestBase {
         }
     }
 
-    private static class ResponseSummary {
+    protected static class ResponseSummary {
         public final StatusLine statusLine;
         public final String entity;
 
@@ -118,4 +149,47 @@ public abstract class VirtualHarServerTestBase {
             this.entity = entity;
         }
     }
-}
+
+    protected static class TrustingClient extends ApacheRecordingClient {
+
+        public TrustingClient() {
+            super(false);
+        }
+
+        @Override
+        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) {
+            super.configureHttpClientBuilder(b, proxy);
+            try {
+                configureClientToTrustBlindly(b);
+            } catch (GeneralSecurityException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    protected static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
+        TrustStrategy trustStrategy = new TrivialTrustStrategy();
+        SSLContext sslContext = SSLContexts
+                .custom()
+                .loadTrustMaterial(trustStrategy)
+                .build();
+        clientBuilder.setSSLContext(sslContext);
+        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, new TrivialHostnameVerifier());
+        clientBuilder.setSSLSocketFactory(sslsf);
+        clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
+    }
+
+    private static final class TrivialHostnameVerifier implements javax.net.ssl.HostnameVerifier {
+        @Override
+        public boolean verify(String s, SSLSession sslSession) {
+            return true;
+        }
+    }
+
+    private static final class TrivialTrustStrategy implements TrustStrategy {
+        @Override
+        public boolean isTrusted(java.security.cert.X509Certificate[] chain, String authType)  {
+            return true;
+        }
+
+    }}

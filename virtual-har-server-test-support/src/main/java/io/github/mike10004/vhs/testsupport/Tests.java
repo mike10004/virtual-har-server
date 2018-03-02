@@ -15,6 +15,13 @@ public class Tests {
 
     private Tests(){}
 
+    public static File getHttpsExampleHarFile(Path temporaryDirectory) throws IOException {
+        ByteSource byteSource = Resources.asByteSource(Tests.class.getResource("/https.www.example.com.har"));
+        File harFile = File.createTempFile("https-example", ".har", temporaryDirectory.toFile());
+        byteSource.copyTo(Files.asByteSink(harFile));
+        return harFile;
+    }
+
     public static File getReplayTest1HarFile(Path temporaryDirectory) throws IOException {
         ByteSource byteSource = Resources.asByteSource(Tests.class.getResource("/replay-test-1.har"));
         File harFile = File.createTempFile("replay-test-1-", ".har", temporaryDirectory.toFile());
