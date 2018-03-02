@@ -48,9 +48,9 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         Path scratchPath = scratch.getRoot();
         try {
             certificateAndKeySource = config.certificateAndKeySourceFactory.produce(config, scratchPath);
-            TlsNanoServer httpsInterceptionServer = config.tlsNanoServerFactory.produce(config, scratchPath, config.nanoResponseManufacturer);
+            TlsEndpoint httpsInterceptionServer = config.tlsEndpointFactory.produce(config, scratchPath);
             closeables.add(httpsInterceptionServer);
-            proxy = startProxy(config.bmpResponseManufacturer, HostAndPort.fromParts("localhost", httpsInterceptionServer.getListeningPort()), certificateAndKeySource);
+            proxy = startProxy(config.bmpResponseManufacturer, httpsInterceptionServer.getSocketAddress(), certificateAndKeySource);
         } catch (RuntimeException | IOException e) {
             closeAll(closeables, true);
             throw e;

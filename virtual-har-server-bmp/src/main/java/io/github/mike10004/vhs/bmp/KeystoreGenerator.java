@@ -25,6 +25,7 @@ public class KeystoreGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(KeystoreGenerator.class);
 
+    @SuppressWarnings("unused")
     public enum KeystoreType {
         PKCS12,
         JKS
@@ -42,8 +43,12 @@ public class KeystoreGenerator {
         this.keystoreType = requireNonNull(keystoreType);
     }
 
+    public KeystoreGenerator(KeystoreType keystoreType, Path scratchDir) {
+        this(keystoreType, scratchDir, new SecureRandom());
+    }
+
     public KeystoreGenerator(KeystoreType keystoreType) {
-        this(keystoreType, FileUtils.getTempDirectory().toPath(), new SecureRandom());
+        this(keystoreType, FileUtils.getTempDirectory().toPath());
     }
 
     public static class KeystoreData {

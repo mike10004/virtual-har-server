@@ -43,10 +43,5 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
         </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>junit5-standin</artifactId>
-            <version>${project.version}</version>
-        </dependency>
     </dependencies>
 </project>

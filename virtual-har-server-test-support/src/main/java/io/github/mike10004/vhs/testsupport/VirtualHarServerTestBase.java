@@ -46,7 +46,12 @@ public abstract class VirtualHarServerTestBase {
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException;
+    public enum TlsStrategy {
+        NO_SUPPORT,
+        SUPPORT_TLS
+    }
+
+    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsStrategy tlsStrategy) throws IOException;
 
     private static final URI oneUri = URI.create("http://example.com/one"),
             twoUri = URI.create("http://example.com/two"),
@@ -58,7 +63,7 @@ public abstract class VirtualHarServerTestBase {
         File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, TlsStrategy.NO_SUPPORT);
         Multimap<URI, ResponseSummary> responses;
         List<URI> uris = Arrays.asList(
                 oneUri, twoUri, notFoundUri
@@ -76,7 +81,7 @@ public abstract class VirtualHarServerTestBase {
         File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, TlsStrategy.SUPPORT_TLS);
         URI uri = URI.create("https://www.example.com/");
         Multimap<URI, ResponseSummary> responses;
         try (VirtualHarServerControl ctrl = server.start()) {

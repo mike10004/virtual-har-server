@@ -73,6 +73,7 @@
             <groupId>com.github.mike10004</groupId>
             <artifactId>native-helper</artifactId>
             <version>8.0.5</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>

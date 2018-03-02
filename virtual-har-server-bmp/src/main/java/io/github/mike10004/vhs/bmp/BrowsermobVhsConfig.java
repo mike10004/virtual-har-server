@@ -11,22 +11,22 @@ import static java.util.Objects.requireNonNull;
 
 public class BrowsermobVhsConfig {
 
+    static final KeystoreType DEFAULT_KEYSTORE_TYPE = KeystoreType.PKCS12;
+
     public final ScratchDirProvider scratchDirProvider;
-    public final NanoResponseManufacturer nanoResponseManufacturer;
     public final BmpResponseManufacturer bmpResponseManufacturer;
-    public final TlsNanoServerFactory tlsNanoServerFactory;
+    public final TlsEndpointFactory tlsEndpointFactory;
     public final CertificateAndKeySourceFactory certificateAndKeySourceFactory;
 
     private BrowsermobVhsConfig(Builder builder) {
         scratchDirProvider = builder.scratchDirProvider;
-        nanoResponseManufacturer = builder.nanoResponseManufacturer;
         bmpResponseManufacturer = builder.bmpResponseManufacturer;
-        tlsNanoServerFactory = builder.tlsNanoServerFactory;
+        tlsEndpointFactory = builder.tlsEndpointFactory;
         certificateAndKeySourceFactory = builder.certificateAndKeySourceFactory;
     }
 
-    public static Builder builder(BmpResponseManufacturer bmanufacturer, NanoResponseManufacturer nmanufacturer) {
-        return new Builder(bmanufacturer, nmanufacturer);
+    public static Builder builder(BmpResponseManufacturer bmanufacturer) {
+        return new Builder(bmanufacturer);
     }
 
     public interface DependencyFactory<T> {
@@ -36,24 +36,21 @@ public class BrowsermobVhsConfig {
     public interface CertificateAndKeySourceFactory extends DependencyFactory<CertificateAndKeySource> {
     }
 
-    public interface TlsNanoServerFactory {
-        TlsNanoServer produce(BrowsermobVhsConfig config, Path scratchDir, NanoResponseManufacturer responseManufacturer) throws IOException;
+    public interface TlsEndpointFactory extends DependencyFactory<TlsEndpoint> {
     }
 
     @SuppressWarnings("unused")
     public static final class Builder {
         private ScratchDirProvider scratchDirProvider;
-        private final NanoResponseManufacturer nanoResponseManufacturer;
         private final BmpResponseManufacturer bmpResponseManufacturer;
-        private TlsNanoServerFactory tlsNanoServerFactory;
+        private TlsEndpointFactory tlsEndpointFactory;
         private CertificateAndKeySourceFactory certificateAndKeySourceFactory;
 
-        private Builder(BmpResponseManufacturer bmpResponseManufacturer, NanoResponseManufacturer nanoResponseManufacturer) {
+        private Builder(BmpResponseManufacturer bmpResponseManufacturer) {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
-            this.nanoResponseManufacturer = requireNonNull(nanoResponseManufacturer);
             scratchDirProvider = ScratchDirProvider.under(FileUtils.getTempDirectory().toPath());
-            tlsNanoServerFactory = new DefaultTlsNanoServerFactory(new KeystoreGenerator(KeystoreType.PKCS12));
-            certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(dir);
+            tlsEndpointFactory = (config, dir) -> new BrokenTlsEndpoint();
+            certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(new KeystoreGenerator(DEFAULT_KEYSTORE_TYPE, dir));
         }
 
         public Builder scratchDirProvider(ScratchDirProvider val) {
@@ -61,9 +58,17 @@ public class BrowsermobVhsConfig {
             return this;
         }
 
-        public Builder tlsNanoServerFactory(TlsNanoServerFactory val) {
-            tlsNanoServerFactory = requireNonNull(val);
+        public Builder tlsEndpointFactory(TlsEndpointFactory val) {
+            tlsEndpointFactory = requireNonNull(val);
             return this;
+        }
+
+        public Builder handleHttps(NanoResponseManufacturer nanoResponseManufacturer) {
+            return handleHttps(new KeystoreGenerator(KeystoreType.PKCS12), nanoResponseManufacturer);
+        }
+
+        public Builder handleHttps(KeystoreGenerator keystoreGenerator, NanoResponseManufacturer nanoResponseManufacturer) {
+            return tlsEndpointFactory(new DefaultTlsNanoServerFactory(keystoreGenerator, nanoResponseManufacturer));
         }
 
         public Builder certificateAndKeySourceFactory(CertificateAndKeySourceFactory val) {

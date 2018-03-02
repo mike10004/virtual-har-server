@@ -1,8 +1,8 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
+import com.google.common.net.HttpHeaders;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,10 +49,8 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
     }
 
     private static void replaceHost(HttpRequest request, String newHostHeaderValue) {
-            HttpHeaders headers = request.headers();
-            Set<String> names = headers.names();
-            log.info("CONNECT: header names: {}", names);
-            request.headers().set(com.google.common.net.HttpHeaders.HOST, newHostHeaderValue);
+        log.debug("replacing host header {} -> {}", request.headers().get(HttpHeaders.HOST), newHostHeaderValue);
+        request.headers().set(com.google.common.net.HttpHeaders.HOST, newHostHeaderValue);
     }
 
     private static class HostRewriteFilter extends HttpsAwareFiltersAdapter {

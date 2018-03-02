@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.google.common.net.HostAndPort;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Response;
@@ -9,25 +10,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
 import java.io.ByteArrayInputStream;
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
 
-public class TlsNanoServer implements Closeable {
+public class TlsNanoServer implements TlsEndpoint {
 
     private static final Logger log = LoggerFactory.getLogger(TlsNanoServer.class);
 
     private final NanoHTTPD server;
-    private final int listeningPort;
+    private final HostAndPort socketAddress;
 
     public TlsNanoServer(@Nullable SSLServerSocketFactory sslServerSocketFactory) throws IOException {
         this.server = new BarrierServer(findOpenPort());
@@ -35,11 +28,12 @@ public class TlsNanoServer implements Closeable {
             server.makeSecure(sslServerSocketFactory, null);
         }
         server.start();
-        listeningPort = server.getListeningPort();
+        socketAddress = HostAndPort.fromParts("localhost", server.getListeningPort());
     }
 
-    public int getListeningPort() {
-        return listeningPort;
+    @Override
+    public HostAndPort getSocketAddress() {
+        return socketAddress;
     }
 
     @Override
@@ -59,6 +53,7 @@ public class TlsNanoServer implements Closeable {
         return produceDefaultErrorResponse(session);
     }
 
+    @SuppressWarnings("unused")
     protected Response produceDefaultErrorResponse(IHTTPSession session) {
         return NanoHTTPD.newFixedLengthResponse(Status.INTERNAL_ERROR, "application/octet-stream", new ByteArrayInputStream(new byte[0]), 0);
     }
@@ -77,7 +72,7 @@ public class TlsNanoServer implements Closeable {
 
         @Override
         public ServerSocketFactory getServerSocketFactory() {
-            log.info("somebody asked for server socket factory");
+            log.debug("somebody asked for server socket factory");
             return super.getServerSocketFactory();
         }
 

@@ -39,7 +39,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     }
 
     @Override
-    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException {
+    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsStrategy tlsStrategy) throws IOException {
         List<HarEntry> entries;
         try {
             entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
@@ -48,7 +48,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         }
         EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
-        HarReplayManufacturer manufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList()) {
+        HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList()) {
             @Override
             public HttpResponse manufacture(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
                 requests.put(ServiceType.BMP, fullCapturedRequest.getMethod(), fullCapturedRequest.getUrl());
@@ -62,9 +62,12 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             }
         };
         Path scratchParent = temporaryFolder.getRoot().toPath();
-        BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(manufacturer, manufacturer)
-                .scratchDirProvider(ScratchDirProvider.under(scratchParent))
-                .build();
+        BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
+                .scratchDirProvider(ScratchDirProvider.under(scratchParent));
+        if (tlsStrategy == TlsStrategy.SUPPORT_TLS) {
+            configBuilder.handleHttps(responseManufacturer);
+        }
+        BrowsermobVhsConfig config = configBuilder.build();
         return new BrowsermobVirtualHarServer(config);
     }
 
