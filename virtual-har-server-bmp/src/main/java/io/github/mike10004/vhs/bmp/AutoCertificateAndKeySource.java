@@ -35,6 +35,9 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class AutoCertificateAndKeySource implements CertificateAndKeySource, java.io.Closeable {
 
+    private static final String KEYSTORE_TYPE = "PKCS12";
+    private static final String KEYSTORE_PRIVATE_KEY_ALIAS = "key";
+
     private static final String EXEC_NAME_KEYTOOL = "keytool";
     private static final String EXEC_NAME_OPENSSL = "openssl";
 
@@ -47,7 +50,6 @@ public class AutoCertificateAndKeySource implements CertificateAndKeySource, jav
     private final Path scratchDir;
     private final Random random;
 
-    @SuppressWarnings("unused")
     public AutoCertificateAndKeySource(Path scratchDir) {
         this(scratchDir, new Random());
     }
@@ -111,9 +113,6 @@ public class AutoCertificateAndKeySource implements CertificateAndKeySource, jav
             super(cause);
         }
     }
-
-    private static final String KEYSTORE_TYPE = "PKCS12";
-    private static final String KEYSTORE_PRIVATE_KEY_ALIAS = "key";
 
     protected static class MemoryKeyStoreCertificateSource extends KeyStoreStreamCertificateSource {
 

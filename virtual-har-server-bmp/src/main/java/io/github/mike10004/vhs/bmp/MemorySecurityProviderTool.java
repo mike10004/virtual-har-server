@@ -15,7 +15,7 @@ import java.security.cert.CertificateException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public final class MemorySecurityProviderTool extends DefaultSecurityProviderTool {
+final class MemorySecurityProviderTool extends DefaultSecurityProviderTool {
 
     @Override
     public KeyStore loadKeyStore(File file, String keyStoreType, String password) {

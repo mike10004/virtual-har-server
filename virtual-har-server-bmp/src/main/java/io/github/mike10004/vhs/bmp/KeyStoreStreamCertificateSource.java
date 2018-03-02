@@ -1,11 +1,11 @@
 package io.github.mike10004.vhs.bmp;
 
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.io.ByteSource;
 import net.lightbody.bmp.mitm.CertificateAndKey;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import net.lightbody.bmp.mitm.KeyStoreCertificateSource;
+import net.lightbody.bmp.mitm.KeyStoreFileCertificateSource;
 import net.lightbody.bmp.mitm.exception.CertificateSourceException;
 import net.lightbody.bmp.mitm.tools.SecurityProviderTool;
 import org.slf4j.Logger;
@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.security.KeyStore;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -22,7 +23,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * from the specified file. Otherwise, attempts to load the KeyStore from a classpath resource.
  */
 public class KeyStoreStreamCertificateSource implements CertificateAndKeySource {
-    private static final Logger log = LoggerFactory.getLogger(net.lightbody.bmp.mitm.KeyStoreFileCertificateSource.class);
+
+    private static final Logger log = LoggerFactory.getLogger(KeyStoreFileCertificateSource.class);
 
     private final ByteSource keyStoreByteSource;
 
@@ -33,7 +35,7 @@ public class KeyStoreStreamCertificateSource implements CertificateAndKeySource 
 
     private final MemorySecurityProviderTool securityProviderTool;
 
-    private final Supplier<CertificateAndKey> certificateAndKey = Suppliers.memoize(() -> loadKeyStore());
+    private final Supplier<CertificateAndKey> certificateAndKey = Suppliers.memoize(this::loadKeyStore);
 
     /**
      * Creates a {@link CertificateAndKeySource} that loads an existing {@link KeyStore} from a classpath resource.

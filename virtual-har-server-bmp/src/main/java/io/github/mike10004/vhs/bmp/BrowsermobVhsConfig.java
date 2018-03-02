@@ -1,17 +1,11 @@
 package io.github.mike10004.vhs.bmp;
 
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import fi.iki.elonen.NanoHTTPD.Response;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.GeneratedKeystore;
+import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import org.apache.commons.io.FileUtils;
 
-import javax.annotation.Nullable;
-import javax.net.ssl.SSLServerSocketFactory;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,27 +40,6 @@ public class BrowsermobVhsConfig {
         TlsNanoServer produce(BrowsermobVhsConfig config, Path scratchDir, NanoResponseManufacturer responseManufacturer) throws IOException;
     }
 
-    protected static class DefaultTlsNanoServerFactory implements TlsNanoServerFactory {
-        @Override
-        public TlsNanoServer produce(BrowsermobVhsConfig config, Path scratchDir, NanoResponseManufacturer responseManufacturer) throws IOException {
-            try {
-                KeystoreGenerator kgen = new KeystoreGenerator();
-                GeneratedKeystore generatedKeystore = kgen.generate();
-                KeyStore keystore = KeystoreGenerator.loadKeystore(generatedKeystore);
-                SSLServerSocketFactory sslServerSocketFactory = KeystoreGenerator.createTlsServerSocketFactory(keystore, generatedKeystore.keystorePassword);
-                return new TlsNanoServer(sslServerSocketFactory) {
-                    @Nullable
-                    @Override
-                    protected Response respond(IHTTPSession session) {
-                        return responseManufacturer.manufacture(session);
-                    }
-                };
-            } catch (GeneralSecurityException e) {
-                throw new IOException(e);
-            }
-        }
-    }
-
     @SuppressWarnings("unused")
     public static final class Builder {
         private ScratchDirProvider scratchDirProvider;
@@ -79,7 +52,7 @@ public class BrowsermobVhsConfig {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
             this.nanoResponseManufacturer = requireNonNull(nanoResponseManufacturer);
             scratchDirProvider = ScratchDirProvider.under(FileUtils.getTempDirectory().toPath());
-            tlsNanoServerFactory = new DefaultTlsNanoServerFactory();
+            tlsNanoServerFactory = new DefaultTlsNanoServerFactory(new KeystoreGenerator(KeystoreType.PKCS12));
             certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(dir);
         }
 
