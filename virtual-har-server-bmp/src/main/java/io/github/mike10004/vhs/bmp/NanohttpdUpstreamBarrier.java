@@ -1,6 +1,8 @@
 package io.github.mike10004.vhs.bmp;
 
 import fi.iki.elonen.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import fi.iki.elonen.NanoHTTPD.Response;
 import fi.iki.elonen.NanoHTTPD.Response.Status;
 
 import java.io.ByteArrayInputStream;
@@ -13,11 +15,7 @@ public class NanohttpdUpstreamBarrier implements UpstreamBarrier {
     private final NanoHTTPD server;
 
     public NanohttpdUpstreamBarrier() throws IOException {
-        this(new BarrierServer(findOpenPort()));
-    }
-
-    protected NanohttpdUpstreamBarrier(NanoHTTPD server) throws IOException {
-        this.server = server;
+        this.server = new BarrierServer(findOpenPort());
         server.start();
     }
 
@@ -37,7 +35,11 @@ public class NanohttpdUpstreamBarrier implements UpstreamBarrier {
         }
     }
 
-    private static class BarrierServer extends NanoHTTPD {
+    protected Response respond(IHTTPSession session) {
+        return NanoHTTPD.newFixedLengthResponse(Status.INTERNAL_ERROR, "application/octet-stream", new ByteArrayInputStream(new byte[0]), 0);
+    }
+
+    private class BarrierServer extends NanoHTTPD {
 
         public BarrierServer(int port) {
             super(port);
@@ -46,7 +48,7 @@ public class NanohttpdUpstreamBarrier implements UpstreamBarrier {
 
         @Override
         public Response serve(IHTTPSession session) {
-            return NanoHTTPD.newFixedLengthResponse(Status.INTERNAL_ERROR, "application/octet-stream", new ByteArrayInputStream(new byte[0]), 0);
+            return respond(session);
         }
     }
 }

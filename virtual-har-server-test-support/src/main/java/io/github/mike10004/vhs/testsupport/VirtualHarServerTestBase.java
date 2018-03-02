@@ -168,7 +168,7 @@ public abstract class VirtualHarServerTestBase {
     }
 
     protected static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
-        TrustStrategy trustStrategy = new TrivialTrustStrategy();
+        TrustStrategy trustStrategy = new BlindTrustStrategy();
         SSLContext sslContext = SSLContexts
                 .custom()
                 .loadTrustMaterial(trustStrategy)
@@ -186,10 +186,11 @@ public abstract class VirtualHarServerTestBase {
         }
     }
 
-    private static final class TrivialTrustStrategy implements TrustStrategy {
+    private static final class BlindTrustStrategy implements TrustStrategy {
         @Override
         public boolean isTrusted(java.security.cert.X509Certificate[] chain, String authType)  {
             return true;
         }
 
-    }}
+    }
+}

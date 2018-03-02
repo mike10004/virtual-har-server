@@ -1,8 +1,11 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.Closeables;
 import com.google.common.net.HostAndPort;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
+import io.github.mike10004.vhs.bmp.ScratchDirProvider.Scratch;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import net.lightbody.bmp.BrowserMobProxy;
@@ -10,24 +13,29 @@ import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import net.lightbody.bmp.proxy.CaptureType;
-import org.apache.commons.io.FileUtils;
 import org.littleshoot.proxy.HttpFilters;
 import org.littleshoot.proxy.HttpFiltersSourceAdapter;
 import org.littleshoot.proxy.MitmManager;
 import org.littleshoot.proxy.impl.ProxyUtils;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
 public class BrowsermobVirtualHarServer implements VirtualHarServer {
+
+    private static final Logger log = LoggerFactory.getLogger(BrowsermobVirtualHarServer.class);
 
     private Supplier<BrowserMobProxy> localProxyInstantiator = BrowserMobProxyServer::new;
 
@@ -39,16 +47,33 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
 
     @Override
     public VirtualHarServerControl start() throws IOException {
-        //noinspection ResultOfMethodCallIgnored
-        config.scratchDir.toFile().mkdirs();
-        if (!config.scratchDir.toFile().isDirectory()) {
-            throw new IOException("could not create directory " + config.scratchDir);
+        List<Closeable> closeables = new ArrayList<>();
+        Scratch scratch = config.scratchDirProvider.createScratchDir();
+        closeables.add(scratch);
+        CertificateAndKeySource certificateAndKeySource;
+        UpstreamBarrier upstreamBarrier;
+        BrowserMobProxy proxy;
+        Path scratchPath = scratch.getRoot();
+        try {
+            certificateAndKeySource = config.certificateAndKeySourceFactory.produce(config, scratchPath);
+            upstreamBarrier = config.upstreamBarrierFactory.produce(config, scratchPath);
+            closeables.add(upstreamBarrier);
+            proxy = startProxy(upstreamBarrier, certificateAndKeySource);
+        } catch (RuntimeException | IOException e) {
+            closeAll(closeables, true);
+            throw e;
         }
-        Path dirToDelete = java.nio.file.Files.createTempDirectory(config.scratchDir, "virtual-har-server-bmp");
-        CertificateAndKeySource certificateAndKeySource = new AutoCertificateAndKeySource(dirToDelete);
-        UpstreamBarrier upstreamBarrier = new NanohttpdUpstreamBarrier();
-        BrowserMobProxy proxy = startProxy(upstreamBarrier, certificateAndKeySource);
-        return new BrowsermobVhsControl(proxy, upstreamBarrier, dirToDelete);
+        return new BrowsermobVhsControl(proxy, closeables);
+    }
+
+    private static void closeAll(Iterable<? extends Closeable> closeables, @SuppressWarnings("SameParameterValue") boolean swallowIOException) {
+        for (Closeable closeable : closeables) {
+            try {
+                Closeables.close(closeable, swallowIOException);
+            } catch (IOException e) {
+                log.warn("failed to close " + closeable, e);
+            }
+        }
     }
 
     public BrowserMobProxy startProxy(UpstreamBarrier upstreamBarrier, CertificateAndKeySource certificateAndKeySource) throws IOException {
@@ -74,7 +99,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
     protected void configureProxy(BrowserMobProxy bmp, UpstreamBarrier upstreamBarrier, CertificateAndKeySource certificateAndKeySource) {
         MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource);
         bmp.setMitmManager(mitmManager);
-        ResponseManufacturer responseManufacturer = config.createResponseManufacturer();
+        ResponseManufacturer responseManufacturer = config.manufacturer;
         bmp.addFirstHttpFilterFactory(new MonitorFiltersSource(responseManufacturer));
         InetSocketAddress upstreamProxy = upstreamBarrier.getSocketAddress();
         bmp.setChainedProxy(upstreamProxy);
@@ -83,13 +108,11 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
     class BrowsermobVhsControl implements VirtualHarServerControl {
 
         private final BrowserMobProxy proxy;
-        private final UpstreamBarrier upstreamBarrier;
-        private final Path dirToDelete;
+        private final ImmutableList<Closeable> closeables;
 
-        BrowsermobVhsControl(BrowserMobProxy proxy, UpstreamBarrier upstreamBarrier, Path dirToDelete) {
+        BrowsermobVhsControl(BrowserMobProxy proxy, Iterable<Closeable> closeables) {
             this.proxy = requireNonNull(proxy);
-            this.upstreamBarrier = requireNonNull(upstreamBarrier);
-            this.dirToDelete = requireNonNull(dirToDelete);
+            this.closeables = ImmutableList.copyOf(closeables);
         }
 
         @Override
@@ -99,13 +122,8 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
 
         @Override
         public void close() throws IOException {
-            try {
-                upstreamBarrier.close();
-            } catch (IOException e) {
-                LoggerFactory.getLogger(BrowsermobVhsControl.class).warn("failed to close upstream barrier");
-            }
+            closeAll(closeables, true);
             proxy.stop();
-            FileUtils.deleteDirectory(dirToDelete.toFile());
         }
     }
 
