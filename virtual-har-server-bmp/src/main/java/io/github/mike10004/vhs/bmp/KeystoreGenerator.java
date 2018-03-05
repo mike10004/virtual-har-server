@@ -32,22 +32,16 @@ public class KeystoreGenerator {
 
     private static final String KEYSTORE_PRIVATE_KEY_ALIAS = "key";
 
-    private final Path scratchDir;
     private final Random random;
     private final KeystoreType keystoreType;
 
-    public KeystoreGenerator(KeystoreType keystoreType, Path scratchDir, Random random) {
-        this.scratchDir = scratchDir;
-        this.random = random;
+    public KeystoreGenerator(KeystoreType keystoreType, Random random) {
+        this.random = requireNonNull(random);
         this.keystoreType = requireNonNull(keystoreType);
     }
 
-    public KeystoreGenerator(KeystoreType keystoreType, Path scratchDir) {
-        this(keystoreType, scratchDir, new SecureRandom());
-    }
-
     public KeystoreGenerator(KeystoreType keystoreType) {
-        this(keystoreType, FileUtils.getTempDirectory().toPath());
+        this(keystoreType, new SecureRandom());
     }
 
     public static class KeystoreData {
@@ -81,11 +75,11 @@ public class KeystoreGenerator {
      * @return the keystore data
      * @throws IOException on I/O error
      */
-    public KeystoreData generate() throws IOException {
+    public KeystoreData generate(Path scratchDir) throws IOException {
         byte[] bytes = new byte[PASSWORD_GENERATION_BYTE_LENGTH];
         random.nextBytes(bytes);
         String password = Base64.getEncoder().encodeToString(bytes);
-        byte[] keystoreBytes = generate(password);
+        byte[] keystoreBytes = generate(scratchDir, password);
         return new KeystoreData(keystoreType, keystoreBytes, password.toCharArray());
     }
 
@@ -99,7 +93,7 @@ public class KeystoreGenerator {
         return RootCertificateGenerator.builder().build();
     }
 
-    protected byte[] generate(String keystorePassword) throws IOException {
+    protected byte[] generate(Path scratchDir, String keystorePassword) throws IOException {
         File keystoreFile = File.createTempFile("dynamically-generated-certificate", ".keystore", scratchDir.toFile());
         try {
             RootCertificateGenerator rootCertificateGenerator = buildCertificateGenerator();

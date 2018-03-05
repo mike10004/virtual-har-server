@@ -3,9 +3,6 @@ package io.github.mike10004.vhs.bmp;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharSource;
 import com.google.common.net.MediaType;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.HttpRespondable;
 import io.github.mike10004.vhs.ResponseInterceptor;
@@ -23,24 +20,22 @@ import java.nio.charset.StandardCharsets;
 
 import static java.util.Objects.requireNonNull;
 
-public class HarReplayManufacturer implements BmpResponseManufacturer, NanoResponseManufacturer {
+public class HarReplayManufacturer implements BmpResponseManufacturer {
 
     private static final Logger log = LoggerFactory.getLogger(HarReplayManufacturer.class);
 
     private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
     private final HttpAssistant<BmpRequest, HttpResponse> bmpAssistant;
-    private final HttpAssistant<NanoHTTPD.IHTTPSession, NanoHTTPD.Response> nanoAssistant;
 
     public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors) {
-        this(entryMatcher, responseInterceptors, new BmpHttpAssistant(), new NanoHttpAssistant());
+        this(entryMatcher, responseInterceptors, new BmpHttpAssistant());
     }
 
-    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, HttpAssistant<BmpRequest, HttpResponse> bmpAssistant, HttpAssistant<IHTTPSession, Response> nanoAssistant) {
+    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, HttpAssistant<BmpRequest, HttpResponse> bmpAssistant) {
         this.entryMatcher = requireNonNull(entryMatcher);
         this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
         this.bmpAssistant = requireNonNull(bmpAssistant);
-        this.nanoAssistant = requireNonNull(nanoAssistant);
     }
 
     @Override
@@ -90,11 +85,6 @@ public class HarReplayManufacturer implements BmpResponseManufacturer, NanoRespo
                 return assistant.constructResponse(incoming, HttpAssistant.standardServerErrorResponse());
             }
         }
-    }
-
-    @Override
-    public NanoHTTPD.Response manufacture(IHTTPSession session) {
-        return manufacture(nanoAssistant, session);
     }
 
 }

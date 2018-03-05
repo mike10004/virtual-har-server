@@ -117,7 +117,7 @@ public class AutoCertificateAndKeySource implements CertificateAndKeySource, jav
     }
 
     protected MemoryKeyStoreCertificateSource generate() throws IOException {
-        KeystoreData keystoreData = keystoreGenerator.generate();
+        KeystoreData keystoreData = keystoreGenerator.generate(FileUtils.getTempDirectory().toPath());
         return new MemoryKeyStoreCertificateSource(keystoreData.keystoreType.name(), keystoreData.keystoreBytes, KEYSTORE_PRIVATE_KEY_ALIAS, String.copyValueOf(keystoreData.keystorePassword));
     }
 

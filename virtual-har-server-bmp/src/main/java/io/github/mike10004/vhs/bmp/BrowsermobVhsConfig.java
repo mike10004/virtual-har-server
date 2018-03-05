@@ -51,7 +51,7 @@ public class BrowsermobVhsConfig {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
             scratchDirProvider = ScratchDirProvider.under(FileUtils.getTempDirectory().toPath());
             tlsEndpointFactory = (config, dir) -> TlsEndpoint.createDefault();
-            certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(new KeystoreGenerator(DEFAULT_KEYSTORE_TYPE, dir));
+            certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(new KeystoreGenerator(DEFAULT_KEYSTORE_TYPE));
         }
 
         public Builder scratchDirProvider(ScratchDirProvider val) {
@@ -64,12 +64,12 @@ public class BrowsermobVhsConfig {
             return this;
         }
 
-        public Builder handleHttps(NanoResponseManufacturer nanoResponseManufacturer) {
-            return handleHttps(new KeystoreGenerator(KeystoreType.PKCS12), nanoResponseManufacturer);
+        public Builder handleHttps() {
+            return handleHttps(new KeystoreGenerator(KeystoreType.PKCS12));
         }
 
-        public Builder handleHttps(KeystoreGenerator keystoreGenerator, NanoResponseManufacturer nanoResponseManufacturer) {
-            return tlsEndpointFactory(new DefaultTlsNanoServerFactory(keystoreGenerator, nanoResponseManufacturer));
+        public Builder handleHttps(KeystoreGenerator keystoreGenerator) {
+            return tlsEndpointFactory(new DefaultTlsNanoServerFactory(keystoreGenerator));
         }
 
         public Builder certificateAndKeySourceFactory(CertificateAndKeySourceFactory val) {

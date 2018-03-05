@@ -2,6 +2,7 @@ package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
 import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.ClientHandler;
 import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response.Status;
@@ -13,20 +14,28 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLServerSocketFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.function.Supplier;
 
-public class TlsNanoServer implements TlsEndpoint {
+import static java.util.Objects.requireNonNull;
+
+class TlsNanoServer implements TlsEndpoint {
 
     private static final Logger log = LoggerFactory.getLogger(TlsNanoServer.class);
 
     private final NanoHTTPD server;
     private final HostAndPort socketAddress;
 
-    public TlsNanoServer(@Nullable SSLServerSocketFactory sslServerSocketFactory) throws IOException {
+    public TlsNanoServer(SSLServerSocketFactory sslServerSocketFactory) throws IOException {
+        this(sslServerSocketFactory, null);
+    }
+
+    public TlsNanoServer(SSLServerSocketFactory sslServerSocketFactory, @Nullable String[] sslProtocols) throws IOException {
         this.server = new BarrierServer(findOpenPort());
-        if (sslServerSocketFactory != null) {
-            server.makeSecure(sslServerSocketFactory, null);
-        }
+        requireNonNull(sslServerSocketFactory, "sslServerSocketFactory");
+        server.makeSecure(sslServerSocketFactory, sslProtocols);
         server.start();
         socketAddress = HostAndPort.fromParts("localhost", server.getListeningPort());
     }
@@ -47,7 +56,6 @@ public class TlsNanoServer implements TlsEndpoint {
         }
     }
 
-    @Nullable
     protected Response respond(IHTTPSession session) {
         log.debug("{} {}", session.getMethod(), StringUtils.abbreviate(session.getUri(), 128));
         return produceDefaultErrorResponse(session);
@@ -71,14 +79,18 @@ public class TlsNanoServer implements TlsEndpoint {
         }
 
         @Override
-        public ServerSocketFactory getServerSocketFactory() {
-            log.debug("somebody asked for server socket factory");
-            return super.getServerSocketFactory();
-        }
-
-        @Override
         protected boolean useGzipWhenAccepted(Response r) {
             return false;
         }
+
+        @Override
+        protected ClientHandler createClientHandler(Socket finalAccept, InputStream inputStream) {
+            return TlsNanoServer.this.createClientHandler(this, finalAccept, inputStream, () -> super.createClientHandler(finalAccept, inputStream));
+        }
     }
+
+    protected ClientHandler createClientHandler(NanoHTTPD server, Socket finalAccept, InputStream inputStream, Supplier<ClientHandler> superSupplier) {
+        return superSupplier.get();
+    }
+
 }

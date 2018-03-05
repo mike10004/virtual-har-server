@@ -1,11 +1,8 @@
 package io.github.mike10004.vhs.bmp;
 
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.bmp.BrowsermobVhsConfig.TlsEndpointFactory;
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreData;
 
-import javax.annotation.Nullable;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
@@ -23,40 +20,22 @@ import static java.util.Objects.requireNonNull;
 class DefaultTlsNanoServerFactory implements TlsEndpointFactory {
 
     private final KeystoreGenerator keystoreGenerator;
-    private final NanoResponseManufacturer nanoResponseManufacturer;
 
-    public DefaultTlsNanoServerFactory(KeystoreGenerator keystoreGenerator, NanoResponseManufacturer nanoResponseManufacturer) {
+    public DefaultTlsNanoServerFactory(KeystoreGenerator keystoreGenerator) {
         this.keystoreGenerator = requireNonNull(keystoreGenerator);
-        this.nanoResponseManufacturer = requireNonNull(nanoResponseManufacturer);
     }
 
-    protected static class ResponseManufacturerNanoServer extends TlsNanoServer {
-        private final NanoResponseManufacturer nanoResponseManufacturer;
-
-        public ResponseManufacturerNanoServer(@Nullable SSLServerSocketFactory serverSocketFactory, NanoResponseManufacturer nanoResponseManufacturer) throws IOException {
-            super(serverSocketFactory);
-            this.nanoResponseManufacturer = nanoResponseManufacturer;
-        }
-
-        @Nullable
-        @Override
-        protected Response respond(IHTTPSession session) {
-            return nanoResponseManufacturer.manufacture(session);
-        }
-
-    }
-
-    protected ResponseManufacturerNanoServer createNanohttpdServer(SSLServerSocketFactory sslServerSocketFactory, NanoResponseManufacturer nanoResponseManufacturer) throws IOException {
-        return new ResponseManufacturerNanoServer(sslServerSocketFactory, nanoResponseManufacturer);
+    protected TlsNanoServer createNanohttpdServer(SSLServerSocketFactory sslServerSocketFactory) throws IOException {
+        return new TlsNanoServer(sslServerSocketFactory);
     }
 
     @Override
     public TlsNanoServer produce(BrowsermobVhsConfig config, Path scratchDir) throws IOException {
         try {
-            KeystoreData keystoreData = keystoreGenerator.generate();
+            KeystoreData keystoreData = keystoreGenerator.generate(scratchDir);
             KeyStore keystore = keystoreData.loadKeystore();
             SSLServerSocketFactory sslServerSocketFactory = createTlsServerSocketFactory(keystore, keystoreData.keystorePassword);
-            return createNanohttpdServer(sslServerSocketFactory, nanoResponseManufacturer);
+            return createNanohttpdServer(sslServerSocketFactory);
         } catch (GeneralSecurityException e) {
             throw new IOException(e);
         }

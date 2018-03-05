@@ -1,17 +1,18 @@
 package io.github.mike10004.vhs.bmp;
 
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.model.HarEntry;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryMatcherFactory;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.VirtualHarServer;
+import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.ClientHandler;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -19,23 +20,32 @@ import net.lightbody.bmp.core.har.HarRequest;
 import org.junit.Before;
 import org.junit.Test;
 
+import javax.net.ssl.SSLServerSocketFactory;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.Socket;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
 
-    private enum ServiceType {
-        BMP, NANO
-    }
-
-    private Table<ServiceType, String, String> requests;
+    private List<String> requests;
+    private List<Socket> secureSockets;
+    private AtomicInteger nanohttpdRespondings;
 
     @Before
-    public void setUp() {
-        requests = HashBasedTable.create();
+    public void setUp() throws IOException {
+        requests = Collections.synchronizedList(new ArrayList<>());
+        secureSockets = Collections.synchronizedList(new ArrayList<>());
+        nanohttpdRespondings = new AtomicInteger(0);
     }
 
     @Override
@@ -51,21 +61,32 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList()) {
             @Override
             public HttpResponse manufacture(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
-                requests.put(ServiceType.BMP, fullCapturedRequest.getMethod(), fullCapturedRequest.getUrl());
+                requests.add(String.format("%s %s", fullCapturedRequest.getMethod(), fullCapturedRequest.getUrl()));
                 return super.manufacture(originalRequest, fullCapturedRequest);
-            }
-
-            @Override
-            public Response manufacture(IHTTPSession session) {
-                requests.put(ServiceType.NANO, session.getMethod().name(), session.getUri());
-                return super.manufacture(session);
             }
         };
         Path scratchParent = temporaryFolder.getRoot().toPath();
         BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(scratchParent));
         if (tlsStrategy == TlsStrategy.SUPPORT_TLS) {
-            configBuilder.handleHttps(responseManufacturer);
+            configBuilder.tlsEndpointFactory(new DefaultTlsNanoServerFactory(new KeystoreGenerator(KeystoreType.PKCS12)) {
+                @Override
+                protected TlsNanoServer createNanohttpdServer(SSLServerSocketFactory sslServerSocketFactory) throws IOException {
+                    return new TlsNanoServer(sslServerSocketFactory) {
+                        @Override
+                        protected ClientHandler createClientHandler(NanoHTTPD server, Socket finalAccept, InputStream inputStream, Supplier<ClientHandler> superSupplier) {
+                            secureSockets.add(finalAccept);
+                            return super.createClientHandler(server, finalAccept, inputStream, superSupplier);
+                        }
+
+                        @Override
+                        protected Response respond(IHTTPSession session) {
+                            nanohttpdRespondings.incrementAndGet();
+                            return super.respond(session);
+                        }
+                    };
+                }
+            });
         }
         BrowsermobVhsConfig config = configBuilder.build();
         return new BrowsermobVirtualHarServer(config);
@@ -74,13 +95,20 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     @Test
     @Override
     public void httpsTest() throws Exception {
+        boolean clean = false;
         try {
             super.httpsTest();
+            clean = true;
         } finally {
             System.out.format("%s requests handled%n", requests.size());
-            requests.cellSet().forEach(cell -> {
-                System.out.format("%s %s %s%n", cell.getRowKey(), cell.getColumnKey(), cell.getValue());
+            requests.forEach(request -> {
+                System.out.format("%s%n", request);
             });
+            if (clean) {
+                assertEquals("num requests", 1, requests.size());
+                assertEquals("num sockets", 0, secureSockets.size());
+                assertEquals("num nanohttpd respondings", 0, nanohttpdRespondings.get());
+            }
         }
     }
 

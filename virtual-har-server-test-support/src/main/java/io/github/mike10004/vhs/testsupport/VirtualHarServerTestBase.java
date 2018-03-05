@@ -87,10 +87,15 @@ public abstract class VirtualHarServerTestBase {
         try (VirtualHarServerControl ctrl = server.start()) {
             ApacheRecordingClient client = new TrustingClient();
             responses = client.collectResponses(Collections.singleton(uri), ctrl.getSocketAddress());
+            httpsTest_ctrlNotYetClosed(ctrl, client, responses);
         }
         assertEquals("num responses", 1, responses.size());
         ResponseSummary summary = responses.values().iterator().next();
         assertTrue("contains correct title", summary.entity.contains("Example Domain over HTTPS"));
+    }
+
+    protected void httpsTest_ctrlNotYetClosed(VirtualHarServerControl ctrl, ApacheRecordingClient client, Multimap<URI, ResponseSummary> responses) {
+
     }
 
     protected void examineResponses(List<URI> attempted, Multimap<URI, ResponseSummary> responses) {
