@@ -1,6 +1,5 @@
 package io.github.mike10004.vhs.bmp;
 
-import com.google.common.io.Files;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -77,23 +76,37 @@ public class KeystoreGenerator {
 
     }
 
+    /**
+     * Generates keystore data with a new randomly-generated password.
+     * @return the keystore data
+     * @throws IOException on I/O error
+     */
     public KeystoreData generate() throws IOException {
-        byte[] bytes = new byte[32];
+        byte[] bytes = new byte[PASSWORD_GENERATION_BYTE_LENGTH];
         random.nextBytes(bytes);
         String password = Base64.getEncoder().encodeToString(bytes);
         byte[] keystoreBytes = generate(password);
         return new KeystoreData(keystoreType, keystoreBytes, password.toCharArray());
     }
 
+    private static final int PASSWORD_GENERATION_BYTE_LENGTH = 32;
+
+    /**
+     * Creates a dynamic CA root certificate generator using default settings (2048-bit RSA keys).
+     * @return the generator
+     */
+    protected RootCertificateGenerator buildCertificateGenerator() {
+        return RootCertificateGenerator.builder().build();
+    }
+
     protected byte[] generate(String keystorePassword) throws IOException {
         File keystoreFile = File.createTempFile("dynamically-generated-certificate", ".keystore", scratchDir.toFile());
         try {
-            // create a dynamic CA root certificate generator using default settings (2048-bit RSA keys)
-            RootCertificateGenerator rootCertificateGenerator = RootCertificateGenerator.builder().build();
+            RootCertificateGenerator rootCertificateGenerator = buildCertificateGenerator();
             rootCertificateGenerator.saveRootCertificateAndKey(keystoreType.name(), keystoreFile,
                     KEYSTORE_PRIVATE_KEY_ALIAS, keystorePassword);
             log.debug("saved keystore to {} ({} bytes)%n", keystoreFile, keystoreFile.length());
-            byte[] keystoreBytes = Files.toByteArray(keystoreFile);
+            byte[] keystoreBytes = java.nio.file.Files.readAllBytes(keystoreFile.toPath());
             return keystoreBytes;
         } finally {
             FileUtils.forceDelete(keystoreFile);

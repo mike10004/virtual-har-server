@@ -1,10 +1,10 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
-import fi.iki.elonen.NanoHTTPD;
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import fi.iki.elonen.NanoHTTPD.Response;
-import fi.iki.elonen.NanoHTTPD.Response.Status;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

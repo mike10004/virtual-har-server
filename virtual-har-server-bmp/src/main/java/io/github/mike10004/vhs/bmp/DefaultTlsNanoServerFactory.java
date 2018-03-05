@@ -1,7 +1,7 @@
 package io.github.mike10004.vhs.bmp;
 
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
-import fi.iki.elonen.NanoHTTPD.Response;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.bmp.BrowsermobVhsConfig.TlsEndpointFactory;
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreData;
 

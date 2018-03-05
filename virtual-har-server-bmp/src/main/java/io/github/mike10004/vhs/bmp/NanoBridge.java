@@ -2,7 +2,7 @@ package io.github.mike10004.vhs.bmp;
 
 import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
-import fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 

@@ -8,6 +8,11 @@ import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Interface defining methods to interpret HTTP message objects.
+ * @param <RQ> request type
+ * @param <RS> response type
+ */
 public interface HttpAssistant<RQ, RS> {
 
     ParsedRequest parseRequest(RQ incomingRequest) throws IOException;

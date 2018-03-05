@@ -18,6 +18,14 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>net.lightbody.bmp</groupId>
+            <artifactId>browsermob-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+        </dependency>
+        <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>virtual-har-server-har-bridge-sstoehr</artifactId>
             <version>${project.version}</version>
@@ -28,10 +36,6 @@
             <artifactId>virtual-har-server-test-support</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>net.lightbody.bmp</groupId>
-            <artifactId>browsermob-core</artifactId>
         </dependency>
         <dependency>
             <groupId>de.sstoehr</groupId>
@@ -74,15 +78,6 @@
             <artifactId>native-helper</artifactId>
             <version>8.0.5</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.nanohttpd</groupId>
-            <artifactId>nanohttpd</artifactId>
-            <version>2.3.1</version>
         </dependency>
     </dependencies>
 

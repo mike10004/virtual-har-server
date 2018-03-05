@@ -1,10 +1,10 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.collect.ImmutableMap;
-import fi.iki.elonen.NanoHTTPD;
-import fi.iki.elonen.NanoHTTPD.CookieHandler;
-import fi.iki.elonen.NanoHTTPD.Method;
-import fi.iki.elonen.NanoHTTPD.ResponseException;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.CookieHandler;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Method;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.ResponseException;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;

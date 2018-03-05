@@ -39,8 +39,9 @@ public class BrowsermobVhsConfig {
     public interface TlsEndpointFactory extends DependencyFactory<TlsEndpoint> {
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "UnusedReturnValue"})
     public static final class Builder {
+
         private ScratchDirProvider scratchDirProvider;
         private final BmpResponseManufacturer bmpResponseManufacturer;
         private TlsEndpointFactory tlsEndpointFactory;
@@ -49,7 +50,7 @@ public class BrowsermobVhsConfig {
         private Builder(BmpResponseManufacturer bmpResponseManufacturer) {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
             scratchDirProvider = ScratchDirProvider.under(FileUtils.getTempDirectory().toPath());
-            tlsEndpointFactory = (config, dir) -> new BrokenTlsEndpoint();
+            tlsEndpointFactory = (config, dir) -> TlsEndpoint.createDefault();
             certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(new KeystoreGenerator(DEFAULT_KEYSTORE_TYPE, dir));
         }
 

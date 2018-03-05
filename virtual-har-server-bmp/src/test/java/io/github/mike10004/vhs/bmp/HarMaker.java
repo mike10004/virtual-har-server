@@ -2,8 +2,7 @@ package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.google.gson.GsonBuilder;
-import fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.core.har.Har;
@@ -25,15 +24,12 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.junit.Test;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
