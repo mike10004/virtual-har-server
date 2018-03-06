@@ -26,6 +26,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import java.io.File;
@@ -98,8 +99,9 @@ public abstract class VirtualHarServerTestBase {
         assertTrue("contains correct title", summary.entity.contains("Example Domain over HTTPS"));
     }
 
+    @SuppressWarnings("unused")
     protected void httpsTest_ctrlNotYetClosed(VirtualHarServerControl ctrl, ApacheRecordingClient client, Multimap<URI, ResponseSummary> responses) {
-
+        // override to do some checks before the proxy server has stopped
     }
 
     protected void examineResponses(List<URI> attempted, Multimap<URI, ResponseSummary> responses) {
@@ -129,12 +131,14 @@ public abstract class VirtualHarServerTestBase {
             }
         }
 
-        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) {
-            b.setProxy(new HttpHost(proxy.getHost(), proxy.getPort()));
+        protected void configureHttpClientBuilder(HttpClientBuilder b, @Nullable HostAndPort proxy) throws Exception {
+            if (proxy != null) {
+                b.setProxy(new HttpHost(proxy.getHost(), proxy.getPort()));
+            }
             b.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false));
         }
 
-        public Multimap<URI, ResponseSummary> collectResponses(Iterable<URI> urisToGet, HostAndPort proxy) throws Exception {
+        public Multimap<URI, ResponseSummary> collectResponses(Iterable<URI> urisToGet, @Nullable HostAndPort proxy) throws Exception {
             Multimap<URI, ResponseSummary> result = ArrayListMultimap.create();
             HttpClientBuilder clientBuilder = HttpClients.custom();
             configureHttpClientBuilder(clientBuilder, proxy);
@@ -171,7 +175,7 @@ public abstract class VirtualHarServerTestBase {
         }
 
         @Override
-        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) {
+        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) throws Exception {
             super.configureHttpClientBuilder(b, proxy);
             try {
                 configureClientToTrustBlindly(b);
@@ -182,18 +186,21 @@ public abstract class VirtualHarServerTestBase {
     }
 
     protected static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
-        TrustStrategy trustStrategy = new BlindTrustStrategy();
         SSLContext sslContext = SSLContexts
                 .custom()
-                .loadTrustMaterial(trustStrategy)
+                .loadTrustMaterial(new BlindTrustStrategy())
                 .build();
         clientBuilder.setSSLContext(sslContext);
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, new TrivialHostnameVerifier());
+        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, blindHostnameVerifier());
         clientBuilder.setSSLSocketFactory(sslsf);
         clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
     }
 
-    private static final class TrivialHostnameVerifier implements javax.net.ssl.HostnameVerifier {
+    protected static javax.net.ssl.HostnameVerifier blindHostnameVerifier() {
+        return new BlindHostnameVerifier();
+    }
+
+    private static final class BlindHostnameVerifier implements javax.net.ssl.HostnameVerifier {
         @Override
         public boolean verify(String s, SSLSession sslSession) {
             return true;

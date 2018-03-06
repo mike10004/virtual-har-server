@@ -1,12 +1,10 @@
 package io.github.mike10004.vhs.bmp;
 
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
-import net.lightbody.bmp.mitm.CertificateAndKey;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import org.apache.commons.io.FileUtils;
 
 import javax.annotation.Nullable;
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -71,7 +69,7 @@ public class BrowsermobVhsConfig {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
             scratchDirProvider = ScratchDirProvider.under(FileUtils.getTempDirectory().toPath());
             tlsEndpointFactory = (config, dir) -> TlsEndpoint.createDefault();
-            certificateAndKeySourceFactory = (config, dir) -> new AutoCertificateAndKeySource(new KeystoreGenerator(DEFAULT_KEYSTORE_TYPE));
+            certificateAndKeySourceFactory = (config, dir) -> new LazyCertificateAndKeySource(new KeystoreGenerator(DEFAULT_KEYSTORE_TYPE));
         }
 
         public Builder port(int port) {

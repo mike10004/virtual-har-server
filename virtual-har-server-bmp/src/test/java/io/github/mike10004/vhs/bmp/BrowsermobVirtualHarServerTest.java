@@ -8,7 +8,6 @@ import io.github.mike10004.vhs.EntryMatcherFactory;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.VirtualHarServer;
-import io.github.mike10004.vhs.bmp.BrowsermobVhsConfig.Builder;
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
@@ -16,18 +15,20 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.ssl.SSLContexts;
 import org.junit.Before;
 import org.junit.Test;
 
+import javax.net.ssl.SSLContext;
 import java.io.File;
 import java.io.IOException;
-import java.net.Socket;
+import java.net.URI;
 import java.nio.file.Path;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
@@ -105,12 +106,22 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     public void httpsTest_pregeneratedCertificate() throws Exception {
         KeystoreGenerator keystoreGenerator = new KeystoreGenerator(KeystoreType.PKCS12);
         KeystoreData keystoreData = keystoreGenerator.generate();
+        CertAwareClient client = new CertAwareClient(keystoreData);
+        checkSelfSignedRequiresTrustConfig(client);
         ServerFactory serverFactory = (port, harFile, entryMatcherFactory) -> {
             return createServer(port, harFile, entryMatcherFactory, b -> {
                 b.certificateAndKeySource(keystoreData.asCertificateAndKeySource());
             });
         };
-        doHttpsTest(serverFactory, () -> new CertAwareClient(keystoreData));
+        doHttpsTest(serverFactory, () -> client);
+    }
+
+    private void checkSelfSignedRequiresTrustConfig(ApacheRecordingClient client) throws Exception {
+        try {
+            client.collectResponses(Collections.singleton(URI.create("https://self-signed.badssl.com/")), null);
+            throw new IllegalStateException("if we're here it means the client wrongly trusted an unknown self-signed certificate");
+        } catch (javax.net.ssl.SSLHandshakeException ignore) {
+        }
     }
 
     private static class CertAwareClient extends ApacheRecordingClient {
@@ -123,9 +134,14 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         }
 
         @Override
-        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) {
+        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) throws Exception {
             super.configureHttpClientBuilder(b, proxy);
-            throw new UnsupportedOperationException("TODO: add certificate to store using " + keystoreData);
+            KeyStore keyStore = keystoreData.loadKeystore();
+            SSLContext customSslContext = SSLContexts.custom()
+                    .loadTrustMaterial(keyStore, null)
+                    .build();
+            b.setSSLContext(customSslContext);
+            b.setSSLHostnameVerifier(blindHostnameVerifier());
         }
     }
 }
