@@ -78,14 +78,6 @@ public class BrowsermobVhsConfig {
             return this;
         }
 
-        public Builder handleHttps() {
-            return handleHttps(new KeystoreGenerator(KeystoreType.PKCS12));
-        }
-
-        public Builder handleHttps(KeystoreGenerator keystoreGenerator) {
-            return tlsEndpointFactory(new DefaultTlsNanoServerFactory(keystoreGenerator));
-        }
-
         public Builder certificateAndKeySourceFactory(CertificateAndKeySourceFactory val) {
             certificateAndKeySourceFactory = requireNonNull(val);
             return this;

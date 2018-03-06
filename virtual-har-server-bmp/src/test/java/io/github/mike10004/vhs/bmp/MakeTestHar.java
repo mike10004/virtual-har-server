@@ -7,8 +7,8 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.gson.Gson;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD;
-import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response.Status;
+import fi.iki.elonen.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD.Response.Status;
 import io.github.mike10004.vhs.bmp.HarMaker.EntrySpec;
 
 import java.io.ByteArrayInputStream;

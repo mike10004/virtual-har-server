@@ -23,6 +23,7 @@ import static java.util.Objects.requireNonNull;
 public class HarReplayManufacturer implements BmpResponseManufacturer {
 
     private static final Logger log = LoggerFactory.getLogger(HarReplayManufacturer.class);
+    private static final Charset OUTGOING_CHARSET = StandardCharsets.UTF_8;
 
     private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
@@ -43,8 +44,6 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
         BmpRequest bmpRequest = BmpRequest.of(originalRequest, fullCapturedRequest);
         return manufacture(bmpAssistant, bmpRequest);
     }
-
-    private static final Charset OUTGOING_CHARSET = StandardCharsets.UTF_8;
 
     protected ImmutableHttpResponse createNotFoundResponse() {
         MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withCharset(OUTGOING_CHARSET);
