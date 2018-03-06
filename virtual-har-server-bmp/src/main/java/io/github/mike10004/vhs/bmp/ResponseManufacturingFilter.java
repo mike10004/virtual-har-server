@@ -247,7 +247,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         } else {
             log.error("should be unreachable; no request captured");
         }
-        // throw new UnreachableCallbackException();
+        throw new UnreachableCallbackException();
     }
 
     @Override
