@@ -5,7 +5,9 @@ import net.lightbody.bmp.mitm.exception.KeyStoreAccessException;
 import net.lightbody.bmp.mitm.tools.DefaultSecurityProviderTool;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -33,4 +35,20 @@ final class MemorySecurityProviderTool extends DefaultSecurityProviderTool {
             throw new ImportException("Error while reading KeyStore", e);
         }
     }
+
+    /**
+     * Exports the keyStore to the specified output stream.
+     *
+     * @param fos             output stream to write to
+     * @param keyStore         KeyStore to export
+     * @param keystorePassword the password for the KeyStore
+     */
+    public void saveKeyStore(OutputStream fos, KeyStore keyStore, String keystorePassword) throws IOException {
+        try {
+            keyStore.store(fos, keystorePassword.toCharArray());
+        } catch (CertificateException | NoSuchAlgorithmException | KeyStoreException e) {
+            throw new KeyStoreAccessException("Unable to write KeyStore to stream", e);
+        }
+    }
+
 }
