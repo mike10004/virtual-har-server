@@ -44,6 +44,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     private transient final Object responseLock = new Object();
     private volatile boolean responseSent;
     private final HarRequest harRequest = new HarRequest();
+    private final BmpResponseFilter proxyToClientResponseFilter;
 
     /**
      * The requestCaptureFilter captures all request content, including headers, trailing headers, and content. This filter
@@ -65,13 +66,14 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
      * @param ctx channel handler context
      * @throws IllegalArgumentException if request method is {@code CONNECT}
      */
-    public ResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer) {
+    public ResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseFilter proxyToClientResponseFilter) {
         super(originalRequest, ctx);
         if (ProxyUtils.isCONNECT(originalRequest)) {
             throw new IllegalArgumentException("HTTP CONNECT requests not supported by these filters");
         }
         requestCaptureFilter = new ClientRequestCaptureFilter(originalRequest);
         this.responseManufacturer = requireNonNull(responseManufacturer);
+        this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
     }
 
     @Override
@@ -122,6 +124,9 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
 
     @Override
     public final HttpObject proxyToClientResponse(HttpObject httpObject) {
+        if (httpObject instanceof HttpResponse) {
+            proxyToClientResponseFilter.filter((HttpResponse)httpObject);
+        }
         return super.proxyToClientResponse(httpObject);
     }
 
@@ -242,6 +247,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         } else {
             log.error("should be unreachable; no request captured");
         }
+        // throw new UnreachableCallbackException();
     }
 
     @Override

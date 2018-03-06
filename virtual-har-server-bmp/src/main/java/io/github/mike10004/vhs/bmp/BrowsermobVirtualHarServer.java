@@ -70,10 +70,14 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
 
     public BrowserMobProxy startProxy(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteDestination, CertificateAndKeySource certificateAndKeySource) throws IOException {
         BrowserMobProxy bmp = instantiateProxy();
-        configureProxy(bmp, responseManufacturer, httpsHostRewriteDestination, certificateAndKeySource);
+        configureProxy(bmp, responseManufacturer, httpsHostRewriteDestination, certificateAndKeySource, config.proxyToClientResponseFilter);
         bmp.enableHarCaptureTypes(getCaptureTypes());
         bmp.newHar();
-        bmp.start();
+        if (config.port == null) {
+            bmp.start();
+        } else {
+            bmp.start(config.port);
+        }
         return bmp;
     }
 
@@ -88,12 +92,14 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         return localProxyInstantiator.get();
     }
 
-    protected void configureProxy(BrowserMobProxy bmp, BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteDestination, CertificateAndKeySource certificateAndKeySource) {
+    protected void configureProxy(BrowserMobProxy bmp,
+                                  BmpResponseManufacturer responseManufacturer,
+                                  HostAndPort httpsHostRewriteDestination,
+                                  CertificateAndKeySource certificateAndKeySource,
+                                  BmpResponseFilter proxyToClientResponseFilter) {
         MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource);
         bmp.setMitmManager(mitmManager);
-//        InetSocketAddress upstreamProxy = upstreamBarrier.getSocketAddress();
-        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, httpsHostRewriteDestination));
-//        bmp.setChainedProxy(upstreamProxy);
+        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, httpsHostRewriteDestination, proxyToClientResponseFilter));
     }
 
     class BrowsermobVhsControl implements VirtualHarServerControl {
@@ -107,7 +113,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         }
 
         @Override
-        public HostAndPort getSocketAddress() {
+        public final HostAndPort getSocketAddress() {
             return HostAndPort.fromParts("localhost", proxy.getPort());
         }
 

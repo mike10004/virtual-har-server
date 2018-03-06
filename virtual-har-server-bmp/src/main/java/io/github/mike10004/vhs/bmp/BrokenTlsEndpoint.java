@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 class BrokenTlsEndpoint implements TlsEndpoint {
 
+    private static final long LISTENING_THREAD_JOIN_TIMEOUT_MS = 1000;
+
     private static final Logger log = LoggerFactory.getLogger(BrokenTlsEndpoint.class);
 
     private final ServerSocket serverSocket;
@@ -24,8 +26,8 @@ class BrokenTlsEndpoint implements TlsEndpoint {
         closed = new AtomicBoolean(false);
         thread = new Thread(() -> {
             while (!closed.get()) {
-                try (Socket ignore = serverSocket.accept()) {
-                    log.info("accepted socket; closing");
+                try (Socket socket = serverSocket.accept()) {
+                    socketAccepted(socket);
                 } catch (IOException e) {
                     if (!isSocketClosedException(e)) {
                         log.info("failed to accept socket", e);
@@ -34,6 +36,11 @@ class BrokenTlsEndpoint implements TlsEndpoint {
             }
         });
         thread.start();
+    }
+
+    @SuppressWarnings("unused")
+    protected void socketAccepted(Socket socket) {
+        log.info("accepted socket; closing");
     }
 
     private static boolean isSocketClosedException(IOException e) {
@@ -50,7 +57,7 @@ class BrokenTlsEndpoint implements TlsEndpoint {
         closed.set(true);
         serverSocket.close();
         try {
-            thread.join(1000);
+            thread.join(LISTENING_THREAD_JOIN_TIMEOUT_MS);
         } catch (InterruptedException e) {
             log.info("thread join interrupted; this is OK and what we want", e);
         }

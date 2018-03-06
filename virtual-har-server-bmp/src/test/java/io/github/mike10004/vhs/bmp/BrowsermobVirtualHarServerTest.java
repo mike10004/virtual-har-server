@@ -14,6 +14,7 @@ import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.ClientHandler;
 import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import io.github.mike10004.vhs.repackaged.fi.iki.elonen.NanoHTTPD.Response;
 import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
@@ -29,7 +30,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static org.junit.Assert.assertEquals;
@@ -40,13 +43,17 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     private List<String> requests;
     private List<Socket> secureSockets;
     private AtomicInteger nanohttpdRespondings;
+    private List<String> customValues;
 
     @Before
     public void setUp() throws IOException {
+        customValues = Collections.synchronizedList(new ArrayList<>());
         requests = Collections.synchronizedList(new ArrayList<>());
         secureSockets = Collections.synchronizedList(new ArrayList<>());
         nanohttpdRespondings = new AtomicInteger(0);
     }
+
+    private static final String CUSTOM_HEADER_NAME = "X-Virtual-Har-Server-Unit-Test";
 
     @Override
     protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsStrategy tlsStrategy) throws IOException {
@@ -66,30 +73,43 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             }
         };
         Path scratchParent = temporaryFolder.getRoot().toPath();
+
+        BmpResponseFilter responseFilter = new HeaderAddingFilter(CUSTOM_HEADER_NAME, () -> {
+            String value = UUID.randomUUID().toString();
+            customValues.add(value);
+            return value;
+        });
         BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
+                .proxyToClientResponseFilter(responseFilter)
                 .scratchDirProvider(ScratchDirProvider.under(scratchParent));
         if (tlsStrategy == TlsStrategy.SUPPORT_TLS) {
-            configBuilder.tlsEndpointFactory(new DefaultTlsNanoServerFactory(new KeystoreGenerator(KeystoreType.PKCS12)) {
-                @Override
-                protected TlsNanoServer createNanohttpdServer(SSLServerSocketFactory sslServerSocketFactory) throws IOException {
-                    return new TlsNanoServer(sslServerSocketFactory) {
-                        @Override
-                        protected ClientHandler createClientHandler(NanoHTTPD server, Socket finalAccept, InputStream inputStream, Supplier<ClientHandler> superSupplier) {
-                            secureSockets.add(finalAccept);
-                            return super.createClientHandler(server, finalAccept, inputStream, superSupplier);
-                        }
-
-                        @Override
-                        protected Response respond(IHTTPSession session) {
-                            nanohttpdRespondings.incrementAndGet();
-                            return super.respond(session);
-                        }
-                    };
-                }
-            });
+//            configBuilder.tlsEndpointFactory(new UnitTestTlsNanoServerFactory());
         }
         BrowsermobVhsConfig config = configBuilder.build();
         return new BrowsermobVirtualHarServer(config);
+    }
+
+    private class UnitTestTlsNanoServerFactory extends DefaultTlsNanoServerFactory {
+
+        public UnitTestTlsNanoServerFactory() {
+            super(new KeystoreGenerator(KeystoreType.PKCS12));
+        }
+        @Override
+        protected TlsNanoServer createNanohttpdServer(SSLServerSocketFactory sslServerSocketFactory) throws IOException {
+            return new TlsNanoServer(sslServerSocketFactory) {
+                @Override
+                protected ClientHandler createClientHandler(NanoHTTPD server, Socket finalAccept, InputStream inputStream, Supplier<ClientHandler> superSupplier) {
+                    secureSockets.add(finalAccept);
+                    return super.createClientHandler(server, finalAccept, inputStream, superSupplier);
+                }
+
+                @Override
+                protected Response respond(IHTTPSession session) {
+                    nanohttpdRespondings.incrementAndGet();
+                    return super.respond(session);
+                }
+            };
+        }
     }
 
     @Test
@@ -106,6 +126,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             });
             if (clean) {
                 assertEquals("num requests", 1, requests.size());
+                assertEquals("num responses", 1, customValues.size());
                 assertEquals("num sockets", 0, secureSockets.size());
                 assertEquals("num nanohttpd respondings", 0, nanohttpdRespondings.get());
             }

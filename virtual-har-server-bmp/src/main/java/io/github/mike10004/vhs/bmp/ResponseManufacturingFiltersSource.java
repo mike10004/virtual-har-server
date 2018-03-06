@@ -23,10 +23,12 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
 
     private final BmpResponseManufacturer responseManufacturer;
     private final HostAndPort httpsHostRewriteValue;
+    private final BmpResponseFilter proxyToClientResponseFilter;
 
-    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteValue) {
+    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteValue, BmpResponseFilter proxyToClientResponseFilter) {
         this.responseManufacturer = requireNonNull(responseManufacturer);
         this.httpsHostRewriteValue = requireNonNull(httpsHostRewriteValue);
+        this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
     }
 
     @Override
@@ -44,7 +46,7 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
         if (ProxyUtils.isCONNECT(originalRequest)) {
             return new HostRewriteFilter(originalRequest, ctx, newHostHeaderValue);
         } else {
-            return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer);
+            return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
         }
     }
 
@@ -66,11 +68,8 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
         public HttpResponse clientToProxyRequest(HttpObject httpObject) {
             if (httpObject instanceof HttpRequest) {
                 HttpRequest req = (HttpRequest) httpObject;
-                System.out.format("%s = %s%n", "full URL", getFullUrl(req));
-                System.out.format("%s = %s%n", "host and port", getHostAndPort(req));
                 replaceHost(req, rewrittenHost);
             }
-            System.out.format("%s = %s%n", "original url", getOriginalUrl());
             return super.clientToProxyRequest(httpObject);
         }
     }
