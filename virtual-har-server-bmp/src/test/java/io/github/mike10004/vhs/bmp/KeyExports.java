@@ -6,8 +6,8 @@ import com.github.mike10004.nativehelper.subprocess.ScopedProcessTracker;
 import com.github.mike10004.nativehelper.subprocess.Subprocess;
 import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
-import io.github.mike10004.vhs.bmp.AutoCertificateAndKeySource.CertificateGenerationException;
-import io.github.mike10004.vhs.bmp.AutoCertificateAndKeySource.MemoryKeyStoreCertificateSource;
+import io.github.mike10004.vhs.bmp.KeystoreGenerator.CertificateGenerationException;
+import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -18,10 +18,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.Random;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Utility class for exporting keys.
+ */
 public class KeyExports {
 
     private static final Logger log = LoggerFactory.getLogger(KeyExports.class);
@@ -29,14 +33,13 @@ public class KeyExports {
     private static final String EXEC_NAME_KEYTOOL = "keytool";
     private static final String EXEC_NAME_OPENSSL = "openssl";
 
-    private final MemoryKeyStoreCertificateSource onDemandSource;
+    private final ExecutableConfig keytoolConfig, opensslConfig;
+    private final KeystoreData onDemandSource;
 
-    public KeyExports(MemoryKeyStoreCertificateSource onDemandSource) {
-        this.onDemandSource = requireNonNull(onDemandSource);
-    }
-
-    public void createPKCS12File(Path scratchDir, File p12File) throws IOException, InterruptedException {
-        createPKCS12File(ExecutableConfig.byNameOnly(EXEC_NAME_KEYTOOL), scratchDir, p12File);
+    public KeyExports(KeystoreData keystoreData) {
+        this.onDemandSource = requireNonNull(keystoreData);
+        this.opensslConfig = ExecutableConfig.byNameOnly(EXEC_NAME_OPENSSL);
+        this.keytoolConfig = ExecutableConfig.byNameOnly(EXEC_NAME_KEYTOOL);
     }
 
     /**
@@ -54,19 +57,19 @@ public class KeyExports {
      * </pre>
      * <p>The contents of `exported-keystore.pem` will be in PEM format.
      */
-    public void createPKCS12File(ExecutableConfig keytoolConfig, Path scratchDir, File p12File) throws IOException, InterruptedException {
+    public void convert(Path scratchDir, KeystoreType destType, File p12File) throws IOException, InterruptedException {
         File keystoreFile = File.createTempFile("AutoCertificateAndKeySource", ".keystore", scratchDir.toFile());
         try {
             Files.write(onDemandSource.keystoreBytes, keystoreFile);
-            String keystorePassword = onDemandSource.keystorePassword;
+            String keystorePassword = String.copyValueOf(onDemandSource.keystorePassword);
             {
                 Subprocess program = keytoolConfig.subprocessBuilder()
                         .arg("-importkeystore")
                         .args("-srckeystore", keystoreFile.getAbsolutePath())
-                        .args("-srcstoretype", "jks")
+                        .args("-srcstoretype", onDemandSource.keystoreType.name().toLowerCase())
                         .args("-srcstorepass", keystorePassword)
                         .args("-destkeystore", p12File.getAbsolutePath())
-                        .args("-deststoretype", "pkcs12")
+                        .args("-deststoretype", destType.name().toLowerCase())
                         .args("-deststorepass", keystorePassword)
                         .build();
                 executeSubprocessAndCheckResult(program, keytoolResult -> {
@@ -83,27 +86,25 @@ public class KeyExports {
     }
 
     public void createPemFile(File pkcs12File, File pemFile) throws IOException, InterruptedException {
-        createPemFile(ExecutableConfig.byNameOnly(EXEC_NAME_OPENSSL), pkcs12File, pemFile);
-    }
-
-    public void createPemFile(ExecutableConfig opensslConfig, File pkcs12File, File pemFile) throws IOException, InterruptedException {
-        String keystorePassword = onDemandSource.keystorePassword;
-        {
-            Subprocess subprocess = opensslConfig.subprocessBuilder()
-                    .arg("pkcs12")
-                    .args("-in", pkcs12File.getAbsolutePath())
-                    .args("-passin", "pass:" + keystorePassword)
-                    .args("-out", pemFile.getAbsolutePath())
-                    .args("-passout", "pass:")
-                    .build();
-            executeSubprocessAndCheckResult(subprocess, opensslResult -> {
-                return new CertificateGenerationException("nonzero exit from openssl: " + opensslResult.exitCode());
-            });
-        }
+        String keystorePassword = String.copyValueOf(onDemandSource.keystorePassword);
+        Subprocess subprocess = opensslConfig.subprocessBuilder()
+                .arg(KeystoreType.PKCS12.name().toLowerCase())
+                .args("-in", pkcs12File.getAbsolutePath())
+                .args("-passin", "pass:" + keystorePassword)
+                .args("-out", pemFile.getAbsolutePath())
+                .args("-passout", "pass:")
+                .build();
+        ProcessResult<String, String> result = executeSubprocessAndCheckResult(subprocess, opensslResult -> {
+            return new CertificateGenerationException("nonzero exit from openssl: " + opensslResult.exitCode());
+        });
         log.debug("pem: {} ({} bytes)", pemFile, pemFile.length());
+        if (pemFile.length() < 1) {
+            System.err.println(result.content().stderr());
+            throw new IOException("openssl failed to create pem file");
+        }
     }
 
-    private void executeSubprocessAndCheckResult(Subprocess subprocess, Function<ProcessResult<String, String>, ? extends RuntimeException> nonzeroExitReaction) throws IOException, InterruptedException {
+    private ProcessResult<String, String> executeSubprocessAndCheckResult(Subprocess subprocess, Function<ProcessResult<String, String>, ? extends RuntimeException> nonzeroExitReaction) throws IOException, InterruptedException {
         ProcessResult<String, String> result = Subprocesses.executeAndWait(subprocess, Charset.defaultCharset(), null);
         if (result.exitCode() != 0) {
             log.error("stderr {}", StringUtils.abbreviateMiddle(result.content().stderr(), "[...]", 256));
@@ -113,6 +114,7 @@ public class KeyExports {
                 throw ex;
             }
         }
+        return result;
     }
 
     private static class Subprocesses {
@@ -128,5 +130,22 @@ public class KeyExports {
             }
             return result;
         }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Random random = new Random(KeyExports.class.getName().hashCode());
+        MemorySecurityProviderTool securityProviderTool = new MemorySecurityProviderTool();
+        KeystoreGenerator generator = new KeystoreGenerator(KeystoreType.JKS, securityProviderTool, random);
+        KeystoreData keystoreData = generator.generate();
+        Path outputDir = java.nio.file.Files.createTempDirectory("key-exports");
+        KeyExports exports = new KeyExports(keystoreData);
+        File p12File = outputDir.resolve("keystore-keytool.pkcs12").toFile();
+        exports.convert(outputDir, KeystoreType.PKCS12, p12File);
+        File pemFile = outputDir.resolve("keystore-openssl.pem").toFile();
+        exports.createPemFile(p12File, pemFile);
+        // securityProviderTool.
+        FileUtils.listFiles(outputDir.toFile(), null, true).forEach(file -> {
+            System.out.format("%s (%d bytes)%n", file, file.length());
+        });
     }
 }

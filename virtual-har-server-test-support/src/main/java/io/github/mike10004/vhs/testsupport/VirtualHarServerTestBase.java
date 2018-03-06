@@ -37,6 +37,7 @@ import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -46,12 +47,7 @@ public abstract class VirtualHarServerTestBase {
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    public enum TlsStrategy {
-        NO_SUPPORT,
-        SUPPORT_TLS
-    }
-
-    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsStrategy tlsStrategy) throws IOException;
+    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException;
 
     private static final URI oneUri = URI.create("http://example.com/one"),
             twoUri = URI.create("http://example.com/two"),
@@ -63,7 +59,7 @@ public abstract class VirtualHarServerTestBase {
         File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, TlsStrategy.NO_SUPPORT);
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
         Multimap<URI, ResponseSummary> responses;
         List<URI> uris = Arrays.asList(
                 oneUri, twoUri, notFoundUri
@@ -77,15 +73,23 @@ public abstract class VirtualHarServerTestBase {
 
     @Test
     public void httpsTest() throws Exception {
+        doHttpsTest(this::createServer, TrustingClient::new);
+    }
+
+    protected interface ServerFactory {
+        VirtualHarServer create(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws Exception;
+    }
+
+    protected void doHttpsTest(ServerFactory serverFactory, Supplier<ApacheRecordingClient> clientFactory) throws Exception {
         Path temporaryDirectory = temporaryFolder.newFolder().toPath();
         File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, TlsStrategy.SUPPORT_TLS);
+        VirtualHarServer server = serverFactory.create(port, harFile, entryMatcherFactory);
         URI uri = URI.create("https://www.example.com/");
         Multimap<URI, ResponseSummary> responses;
         try (VirtualHarServerControl ctrl = server.start()) {
-            ApacheRecordingClient client = new TrustingClient();
+            ApacheRecordingClient client = clientFactory.get();
             responses = client.collectResponses(Collections.singleton(uri), ctrl.getSocketAddress());
             httpsTest_ctrlNotYetClosed(ctrl, client, responses);
         }

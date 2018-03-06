@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.google.common.net.HostAndPort;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.model.HarEntry;
 import io.github.mike10004.vhs.EntryMatcher;
@@ -7,11 +8,14 @@ import io.github.mike10004.vhs.EntryMatcherFactory;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.VirtualHarServer;
+import io.github.mike10004.vhs.bmp.BrowsermobVhsConfig.Builder;
+import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -24,7 +28,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
+import static java.util.Objects.requireNonNull;
 import static org.junit.Assert.assertEquals;
 
 public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
@@ -41,7 +47,11 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     private static final String CUSTOM_HEADER_NAME = "X-Virtual-Har-Server-Unit-Test";
 
     @Override
-    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsStrategy tlsStrategy) throws IOException {
+    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException {
+        return createServer(port, harFile, entryMatcherFactory, b -> {});
+    }
+
+    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, Consumer<? super BrowsermobVhsConfig.Builder> configBuilderModifier) throws IOException {
         List<HarEntry> entries;
         try {
             entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
@@ -58,15 +68,16 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             }
         };
         Path scratchParent = temporaryFolder.getRoot().toPath();
-
         BmpResponseFilter responseFilter = new HeaderAddingFilter(CUSTOM_HEADER_NAME, () -> {
             String value = UUID.randomUUID().toString();
             customValues.add(value);
             return value;
         });
         BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
+                .port(port)
                 .proxyToClientResponseFilter(responseFilter)
                 .scratchDirProvider(ScratchDirProvider.under(scratchParent));
+        configBuilderModifier.accept(configBuilder);
         BrowsermobVhsConfig config = configBuilder.build();
         return new BrowsermobVirtualHarServer(config);
     }
@@ -90,4 +101,31 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         }
     }
 
+    @Test
+    public void httpsTest_pregeneratedCertificate() throws Exception {
+        KeystoreGenerator keystoreGenerator = new KeystoreGenerator(KeystoreType.PKCS12);
+        KeystoreData keystoreData = keystoreGenerator.generate();
+        ServerFactory serverFactory = (port, harFile, entryMatcherFactory) -> {
+            return createServer(port, harFile, entryMatcherFactory, b -> {
+                b.certificateAndKeySource(keystoreData.asCertificateAndKeySource());
+            });
+        };
+        doHttpsTest(serverFactory, () -> new CertAwareClient(keystoreData));
+    }
+
+    private static class CertAwareClient extends ApacheRecordingClient {
+
+        private final KeystoreData keystoreData;
+
+        public CertAwareClient(KeystoreData keystoreData) {
+            super(false);
+            this.keystoreData = requireNonNull(keystoreData);
+        }
+
+        @Override
+        protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) {
+            super.configureHttpClientBuilder(b, proxy);
+            throw new UnsupportedOperationException("TODO: add certificate to store using " + keystoreData);
+        }
+    }
 }

@@ -5,7 +5,6 @@ import net.lightbody.bmp.mitm.exception.KeyStoreAccessException;
 import net.lightbody.bmp.mitm.tools.DefaultSecurityProviderTool;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.KeyStore;
@@ -17,6 +16,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 final class MemorySecurityProviderTool extends DefaultSecurityProviderTool {
 
+    public MemorySecurityProviderTool() {
+    }
+
     @Override
     public KeyStore loadKeyStore(File file, String keyStoreType, String password) {
         throw new ImportException("loading from file not supported by " + getClass());
@@ -26,7 +28,7 @@ final class MemorySecurityProviderTool extends DefaultSecurityProviderTool {
         checkNotNull(bytes, "bytes");
         checkNotNull(password, "password");
         try {
-            return KeystoreGenerator.KeystoreData.loadKeystore(keyStoreType, bytes, password);
+            return KeystoreData.loadKeystore(keyStoreType, bytes, password);
         } catch (KeyStoreException e) {
             throw new KeyStoreAccessException("Unable to get KeyStore instance of type: " + keyStoreType, e);
         } catch (IOException e) {

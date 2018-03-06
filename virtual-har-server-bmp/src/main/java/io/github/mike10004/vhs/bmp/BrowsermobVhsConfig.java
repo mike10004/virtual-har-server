@@ -1,10 +1,12 @@
 package io.github.mike10004.vhs.bmp;
 
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
+import net.lightbody.bmp.mitm.CertificateAndKey;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import org.apache.commons.io.FileUtils;
 
 import javax.annotation.Nullable;
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -40,6 +42,15 @@ public class BrowsermobVhsConfig {
     }
 
     public interface CertificateAndKeySourceFactory extends DependencyFactory<CertificateAndKeySource> {
+
+        static CertificateAndKeySourceFactory predefined(CertificateAndKeySource certificateAndKeySource) {
+            return new CertificateAndKeySourceFactory() {
+                @Override
+                public CertificateAndKeySource produce(BrowsermobVhsConfig config, Path scratchDir) {
+                    return certificateAndKeySource;
+                }
+            };
+        }
     }
 
     public interface TlsEndpointFactory extends DependencyFactory<TlsEndpoint> {
@@ -76,6 +87,10 @@ public class BrowsermobVhsConfig {
         public Builder tlsEndpointFactory(TlsEndpointFactory val) {
             tlsEndpointFactory = requireNonNull(val);
             return this;
+        }
+
+        public Builder certificateAndKeySource(CertificateAndKeySource certificateAndKeySource) {
+            return certificateAndKeySourceFactory(CertificateAndKeySourceFactory.predefined(certificateAndKeySource));
         }
 
         public Builder certificateAndKeySourceFactory(CertificateAndKeySourceFactory val) {
