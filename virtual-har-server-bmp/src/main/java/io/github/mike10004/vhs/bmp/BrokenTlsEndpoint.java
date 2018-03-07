@@ -59,7 +59,7 @@ class BrokenTlsEndpoint implements TlsEndpoint {
         try {
             thread.join(LISTENING_THREAD_JOIN_TIMEOUT_MS);
         } catch (InterruptedException e) {
-            log.info("thread join interrupted; this is OK and what we want", e);
+            log.debug("thread join interrupted; this is OK");
         }
         try {
             thread.interrupt();
