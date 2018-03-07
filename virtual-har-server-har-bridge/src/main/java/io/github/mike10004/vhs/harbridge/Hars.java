@@ -360,10 +360,8 @@ public class Hars {
             return uncompressedReturnValue;
         }
         if (contentSize.longValue() < bodySize.longValue()) {
-            log.warn("contentSize {} < bodySize {} but this violates HAR spec", contentSize, bodySize);
-            return uncompressedReturnValue;
+            log.debug("contentSize {} < bodySize {}; this either violates HAR spec or compression added to byte count", contentSize, bodySize);
         }
-        // invariant here: bodySize < contentSize, implying data must be compressed
         if (contentEncodingHeaderValue == null) {
             // if content-encoding header value is null, we'll assume gzip for now;
             // TODO try to determine compression type by sniffing data
