@@ -1,8 +1,8 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.gson.GsonBuilder;
-import fi.iki.elonen.NanoHTTPD;
-import fi.iki.elonen.NanoHTTPD.Response.Status;
+import io.github.mike10004.vhs.bmp.repackaged.fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.bmp.repackaged.fi.iki.elonen.NanoHTTPD.Response.Status;
 import io.github.mike10004.vhs.bmp.HarMaker.EntrySpec;
 import io.github.mike10004.vhs.bmp.HarMaker.HttpCallback;
 import net.lightbody.bmp.core.har.Har;

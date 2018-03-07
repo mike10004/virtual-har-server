@@ -1,9 +1,11 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
+import net.lightbody.bmp.mitm.TrustSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -66,5 +68,11 @@ class BrokenTlsEndpoint implements TlsEndpoint {
         } catch (RuntimeException e) {
             log.warn("thread interrupt error", e);
         }
+    }
+
+    @Nullable
+    @Override
+    public TrustSource getTrustSource() {
+        return TrustSource.defaultTrustSource();
     }
 }

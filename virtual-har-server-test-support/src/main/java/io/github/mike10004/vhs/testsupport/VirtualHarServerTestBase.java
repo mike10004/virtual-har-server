@@ -48,7 +48,12 @@ public abstract class VirtualHarServerTestBase {
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws IOException;
+    public enum TlsMode {
+        SUPPORT_REQUIRED,
+        NO_SUPPORT_REQUIRED
+    }
+
+    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsMode tlsMode) throws IOException;
 
     private static final URI oneUri = URI.create("http://example.com/one"),
             twoUri = URI.create("http://example.com/two"),
@@ -60,7 +65,7 @@ public abstract class VirtualHarServerTestBase {
         File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory);
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, TlsMode.NO_SUPPORT_REQUIRED);
         Multimap<URI, ResponseSummary> responses;
         List<URI> uris = Arrays.asList(
                 oneUri, twoUri, notFoundUri
@@ -74,11 +79,13 @@ public abstract class VirtualHarServerTestBase {
 
     @Test
     public void httpsTest() throws Exception {
-        doHttpsTest(this::createServer, TrustingClient::new);
+        doHttpsTest(((port, harFile, entryMatcherFactory, tlsMode) -> {
+            return createServer(port, harFile, entryMatcherFactory, TlsMode.SUPPORT_REQUIRED);
+        }), TrustingClient::new);
     }
 
     protected interface ServerFactory {
-        VirtualHarServer create(int port, File harFile, EntryMatcherFactory entryMatcherFactory) throws Exception;
+        VirtualHarServer create(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsMode tlsMode) throws Exception;
     }
 
     protected void doHttpsTest(ServerFactory serverFactory, Supplier<ApacheRecordingClient> clientFactory) throws Exception {
@@ -86,7 +93,7 @@ public abstract class VirtualHarServerTestBase {
         File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = serverFactory.create(port, harFile, entryMatcherFactory);
+        VirtualHarServer server = serverFactory.create(port, harFile, entryMatcherFactory, TlsMode.SUPPORT_REQUIRED);
         URI uri = URI.create("https://www.example.com/");
         Multimap<URI, ResponseSummary> responses;
         try (VirtualHarServerControl ctrl = server.start()) {
@@ -96,7 +103,11 @@ public abstract class VirtualHarServerTestBase {
         }
         assertEquals("num responses", 1, responses.size());
         ResponseSummary summary = responses.values().iterator().next();
-        assertTrue("contains correct title", summary.entity.contains("Example Domain over HTTPS"));
+        boolean containsTitle = summary.entity.contains("Example Domain over HTTPS");
+        if (!containsTitle) {
+            System.out.format("about to fail on this:%n%s%n", summary.entity);
+        }
+        assertTrue("contains correct title", containsTitle);
     }
 
     @SuppressWarnings("unused")

@@ -2,7 +2,7 @@ package io.github.mike10004.vhs.bmp;
 
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Uninterruptibles;
-import fi.iki.elonen.NanoHTTPD;
+import io.github.mike10004.vhs.bmp.repackaged.fi.iki.elonen.NanoHTTPD;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.core.har.Har;

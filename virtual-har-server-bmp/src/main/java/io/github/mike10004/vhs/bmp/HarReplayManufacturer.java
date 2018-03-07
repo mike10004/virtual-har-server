@@ -28,15 +28,17 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
     private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
     private final HttpAssistant<BmpRequest, HttpResponse> bmpAssistant;
+    private final BmpResponseListener responseListener;
 
-    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors) {
-        this(entryMatcher, responseInterceptors, new BmpHttpAssistant());
+    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) {
+        this(entryMatcher, responseInterceptors, responseListener, new BmpHttpAssistant());
     }
 
-    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, HttpAssistant<BmpRequest, HttpResponse> bmpAssistant) {
+    protected HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener, HttpAssistant<BmpRequest, HttpResponse> bmpAssistant) {
         this.entryMatcher = requireNonNull(entryMatcher);
         this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
         this.bmpAssistant = requireNonNull(bmpAssistant);
+        this.responseListener = requireNonNull(responseListener);
     }
 
     @Override
@@ -75,13 +77,17 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
             }
         }
         if (bestEntry == null) {
-            return assistant.constructResponse(incoming, createNotFoundResponse());
+            ImmutableHttpResponse response = createNotFoundResponse();
+            responseListener.respondingWithError(request, response.status);
+            return assistant.constructResponse(incoming, response);
         } else {
             try {
                 return assistant.transformRespondable(incoming, bestEntry);
             } catch (IOException e) {
                 log.warn("failed to construct response", e);
-                return assistant.constructResponse(incoming, HttpAssistant.standardServerErrorResponse());
+                ImmutableHttpResponse response = HttpAssistant.standardServerErrorResponse();
+                responseListener.respondingWithError(request, response.status);
+                return assistant.constructResponse(incoming, response);
             }
         }
     }

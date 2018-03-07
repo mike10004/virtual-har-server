@@ -1,6 +1,8 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.net.HostAndPort;
+import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URIBuilder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObject;
@@ -22,6 +24,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -136,12 +140,50 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
      */
     private void populateHarRequestFromHttpRequest(HttpRequest httpRequest, HarRequest harRequest) {
         harRequest.setMethod(httpRequest.getMethod().toString());
-        harRequest.setUrl(getFullUrl(httpRequest));
+        String fullUrl = getFullUrl(httpRequest);
+        String originalUrl = getOriginalUrl();
+        log.debug("choose: {} or {}", fullUrl, originalUrl);
+        harRequest.setUrl(reconstructUrlFromFullUrlAndHostHeader(httpRequest));
         harRequest.setHttpVersion(httpRequest.getProtocolVersion().text());
         // the HAR spec defines the request.url field as:
         //     url [string] - Absolute URL of the request (fragments are not included).
         // the URI on the httpRequest may only identify the path of the resource, so find the full URL.
         // the full URL consists of the scheme + host + port (if non-standard) + path + query params + fragment.
+    }
+
+    private static String removePort(String hostHeaderValue) {
+        HostAndPort hap = HostAndPort.fromString(hostHeaderValue);
+        return hap.getHost();
+    }
+
+    protected String reconstructUrlFromFullUrlAndHostHeader(HttpRequest request) {
+        String fullUrl = getFullUrl(request);
+        if (isHttps()) {
+            String hostHeader = request.headers().get(com.google.common.net.HttpHeaders.HOST);
+            if (hostHeader != null) {
+                try {
+                    URI uri = new URIBuilder(fullUrl)
+                            .setHost(removePort(hostHeader))
+                            .build();
+                    fullUrl = uri.toString();
+                } catch (URISyntaxException e) {
+                    log.info("failed to reconstruct URL with proper host", e);
+                }
+            } else {
+                log.info("no host header in request {} {}", request.getMethod(), fullUrl);
+            }
+        }
+        return fullUrl;
+    }
+
+    @Override
+    public String getFullUrl(HttpRequest modifiedRequest) {
+        return super.getFullUrl(modifiedRequest);
+    }
+
+    @Override
+    public String getOriginalUrl() {
+        return super.getOriginalUrl();
     }
 
     protected void captureQueryParameters(HttpRequest httpRequest, HarRequest harRequest) {

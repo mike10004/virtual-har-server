@@ -46,7 +46,7 @@ public class RunnageExample {
             EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
             EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
             EntryMatcher entryMatcher = new PrintingEntryMatcher(entryMatcherFactory.createEntryMatcher(entries, parser), System.out);
-            HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList());
+            HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList(), (x, y) -> {});
             AtomicLong counter = new AtomicLong(0);
             BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
                     .port(port)

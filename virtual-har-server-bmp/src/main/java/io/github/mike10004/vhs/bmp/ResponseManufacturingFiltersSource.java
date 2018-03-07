@@ -51,7 +51,8 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
     }
 
     private static void replaceHost(HttpRequest request, String newHostHeaderValue) {
-        log.debug("replacing host header {} -> {}", request.headers().get(HttpHeaders.HOST), newHostHeaderValue);
+        log.debug("replacing URI and host header {} -> {}", request.headers().get(HttpHeaders.HOST), newHostHeaderValue);
+        request.setUri(newHostHeaderValue);
         request.headers().set(com.google.common.net.HttpHeaders.HOST, newHostHeaderValue);
     }
 
