@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
@@ -44,12 +45,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
 
@@ -65,11 +66,12 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     private static final String CUSTOM_HEADER_NAME = "X-Virtual-Har-Server-Unit-Test";
 
     @Override
-    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsMode tlsMode) throws IOException {
-        return createServer(port, harFile, entryMatcherFactory, tlsMode, b -> {});
+    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TestContext context) throws IOException {
+        BrowsermobVhsConfig config = createServerConfig(port, harFile, entryMatcherFactory, context);
+        return new BrowsermobVirtualHarServer(config);
     }
 
-    protected VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsMode tlsMode, Consumer<? super BrowsermobVhsConfig.Builder> configBuilderModifier) throws IOException {
+    protected BrowsermobVhsConfig createServerConfig(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TestContext context) throws IOException {
         List<HarEntry> entries;
         try {
             entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
@@ -91,13 +93,14 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             customValues.add(value);
             return value;
         });
-        KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate();
         BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
                     .port(port)
                     .proxyToClientResponseFilter(responseFilter)
                     .scratchDirProvider(ScratchDirProvider.under(scratchParent));
-        if (tlsMode == TlsMode.SUPPORT_REQUIRED) {
+        TlsMode tlsMode = context.get(KEY_TLS_MODE);
+        if (tlsMode == TlsMode.SUPPORT_REQUIRED || tlsMode == TlsMode.PREDEFINED_CERT_SUPPORT) {
             try {
+                KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate();
                 SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
                 TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustSource(keystoreData);
                 configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null));
@@ -105,9 +108,11 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
                 throw new RuntimeException(e);
             }
         }
-        configBuilderModifier.accept(configBuilder);
-        BrowsermobVhsConfig config = configBuilder.build();
-        return new BrowsermobVirtualHarServer(config);
+        if (tlsMode == TlsMode.PREDEFINED_CERT_SUPPORT) {
+            KeystoreData keystoreData = context.get(KEY_KEYSTORE_DATA);
+            configBuilder.certificateAndKeySource(keystoreData.asCertificateAndKeySource());
+        }
+        return configBuilder.build();
     }
 
     @Test
@@ -129,19 +134,19 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         }
     }
 
+    private static final String KEY_KEYSTORE_DATA = "keystoreData";
+
     @Test
     public void httpsTest_pregeneratedCertificate() throws Exception {
         KeystoreGenerator keystoreGenerator = new KeystoreGenerator(KeystoreType.PKCS12);
         KeystoreData keystoreData = keystoreGenerator.generate();
         CertAwareClient client = new CertAwareClient(keystoreData);
         checkSelfSignedRequiresTrustConfig(client);
-
-        ServerFactory serverFactory = (port, harFile, entryMatcherFactory, tlsMode) -> {
-            return createServer(port, harFile, entryMatcherFactory, tlsMode, b -> {
-                b.certificateAndKeySource(keystoreData.asCertificateAndKeySource());
-            });
-        };
-        doHttpsTest(serverFactory, () -> client);
+        TestContext context = new TestContext();
+        context.put(KEY_CLIENT_SUPPLIER, Suppliers.ofInstance(client));
+        context.put(KEY_TLS_MODE, TlsMode.PREDEFINED_CERT_SUPPORT);
+        context.put(KEY_KEYSTORE_DATA, keystoreData);
+        doHttpsTest(context);
     }
 
     private void checkSelfSignedRequiresTrustConfig(ApacheRecordingClient client) throws Exception {
@@ -258,5 +263,10 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
                 System.out.format("responding with status %s to %s %s", status, request.method, request.url);
             }
         };
+    }
+
+    @Test
+    public void https_rejectUpstreamBadCertificate() {
+        fail("not yet implemented");
     }
 }

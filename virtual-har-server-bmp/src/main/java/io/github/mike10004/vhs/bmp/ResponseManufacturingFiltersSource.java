@@ -24,11 +24,17 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
     private final BmpResponseManufacturer responseManufacturer;
     private final HostAndPort httpsHostRewriteValue;
     private final BmpResponseFilter proxyToClientResponseFilter;
+    private final PassthruPredicate passthruPredicate;
 
-    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteValue, BmpResponseFilter proxyToClientResponseFilter) {
+    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteValue, BmpResponseFilter proxyToClientResponseFilter, PassthruPredicate passthruPredicate) {
         this.responseManufacturer = requireNonNull(responseManufacturer);
         this.httpsHostRewriteValue = requireNonNull(httpsHostRewriteValue);
         this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
+        this.passthruPredicate = requireNonNull(passthruPredicate);
+    }
+
+    public interface PassthruPredicate {
+        boolean isForwardable(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx);
     }
 
     @Override
@@ -42,6 +48,9 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
     }
 
     private HttpFilters doFilterRequest(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx) {
+        if (passthruPredicate.isForwardable(originalRequest, ctx)) {
+            return null;
+        }
         String newHostHeaderValue = rewriteHostHeader();
         if (ProxyUtils.isCONNECT(originalRequest)) {
             return new HostRewriteFilter(originalRequest, ctx, newHostHeaderValue);

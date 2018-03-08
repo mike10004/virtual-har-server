@@ -5,6 +5,7 @@ import com.google.common.io.Closeables;
 import com.google.common.net.HostAndPort;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
+import io.github.mike10004.vhs.bmp.ResponseManufacturingFiltersSource.PassthruPredicate;
 import io.github.mike10004.vhs.bmp.ScratchDirProvider.Scratch;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
@@ -92,6 +93,12 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         return mitmManager;
     }
 
+    protected PassthruPredicate createPassthruPredicate() {
+        return DEFAULT_PASSTHRU_PREDICATE;
+    }
+
+    protected static final PassthruPredicate DEFAULT_PASSTHRU_PREDICATE = (req, ctx) -> false;
+
     protected BrowserMobProxy instantiateProxy() {
         return localProxyInstantiator.get();
     }
@@ -104,7 +111,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
                                   @Nullable TrustSource trustSource) {
         MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource, trustSource);
         bmp.setMitmManager(mitmManager);
-        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, httpsHostRewriteDestination, proxyToClientResponseFilter));
+        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, httpsHostRewriteDestination, proxyToClientResponseFilter, createPassthruPredicate()));
     }
 
     class BrowsermobVhsControl implements VirtualHarServerControl {

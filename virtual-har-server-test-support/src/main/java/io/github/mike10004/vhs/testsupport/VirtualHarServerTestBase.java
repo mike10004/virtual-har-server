@@ -37,7 +37,9 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.junit.Assert.assertEquals;
@@ -50,14 +52,37 @@ public abstract class VirtualHarServerTestBase {
 
     public enum TlsMode {
         SUPPORT_REQUIRED,
-        NO_SUPPORT_REQUIRED
+        NO_SUPPORT_REQUIRED,
+        PREDEFINED_CERT_SUPPORT
     }
 
-    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsMode tlsMode) throws IOException;
+    protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TestContext context) throws IOException;
 
     private static final URI oneUri = URI.create("http://example.com/one"),
             twoUri = URI.create("http://example.com/two"),
             notFoundUri = URI.create("http://example.com/not-found");
+
+    protected static final String KEY_TLS_MODE = "tlsMode";
+    protected static final String KEY_CLIENT_SUPPLIER = "clientSupplier";
+
+    protected static class TestContext {
+
+        private final Map<String, Object> items;
+
+        public TestContext() {
+            items = new HashMap<>();
+        }
+
+        public TestContext put(String key, Object value) {
+            items.put(key, value);
+            return this;
+        }
+
+        public <T> T get(String key) {
+            //noinspection unchecked
+            return (T) items.get(key);
+        }
+    }
 
     @Test
     public void basicTest() throws Exception {
@@ -65,7 +90,7 @@ public abstract class VirtualHarServerTestBase {
         File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, TlsMode.NO_SUPPORT_REQUIRED);
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, new TestContext().put(KEY_TLS_MODE, TlsMode.NO_SUPPORT_REQUIRED));
         Multimap<URI, ResponseSummary> responses;
         List<URI> uris = Arrays.asList(
                 oneUri, twoUri, notFoundUri
@@ -79,24 +104,23 @@ public abstract class VirtualHarServerTestBase {
 
     @Test
     public void httpsTest() throws Exception {
-        doHttpsTest(((port, harFile, entryMatcherFactory, tlsMode) -> {
-            return createServer(port, harFile, entryMatcherFactory, TlsMode.SUPPORT_REQUIRED);
-        }), TrustingClient::new);
+        TestContext context = new TestContext();
+        context.put(KEY_TLS_MODE, TlsMode.SUPPORT_REQUIRED);
+        Supplier<BlindlyTrustingClient> clientSupplier = BlindlyTrustingClient::new;
+        context.put(KEY_CLIENT_SUPPLIER, clientSupplier);
+        doHttpsTest(context);
     }
 
-    protected interface ServerFactory {
-        VirtualHarServer create(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TlsMode tlsMode) throws Exception;
-    }
-
-    protected void doHttpsTest(ServerFactory serverFactory, Supplier<ApacheRecordingClient> clientFactory) throws Exception {
+    protected void doHttpsTest(TestContext context) throws Exception {
         Path temporaryDirectory = temporaryFolder.newFolder().toPath();
         File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
-        VirtualHarServer server = serverFactory.create(port, harFile, entryMatcherFactory, TlsMode.SUPPORT_REQUIRED);
+        VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, context);
         URI uri = URI.create("https://www.example.com/");
         Multimap<URI, ResponseSummary> responses;
         try (VirtualHarServerControl ctrl = server.start()) {
+            Supplier<ApacheRecordingClient> clientFactory = context.get(KEY_CLIENT_SUPPLIER);
             ApacheRecordingClient client = clientFactory.get();
             responses = client.collectResponses(Collections.singleton(uri), ctrl.getSocketAddress());
             httpsTest_ctrlNotYetClosed(ctrl, client, responses);
@@ -179,9 +203,9 @@ public abstract class VirtualHarServerTestBase {
         }
     }
 
-    protected static class TrustingClient extends ApacheRecordingClient {
+    protected static class BlindlyTrustingClient extends ApacheRecordingClient {
 
-        public TrustingClient() {
+        public BlindlyTrustingClient() {
             super(false);
         }
 
@@ -194,17 +218,18 @@ public abstract class VirtualHarServerTestBase {
                 throw new RuntimeException(e);
             }
         }
-    }
 
-    protected static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
-        SSLContext sslContext = SSLContexts
-                .custom()
-                .loadTrustMaterial(new BlindTrustStrategy())
-                .build();
-        clientBuilder.setSSLContext(sslContext);
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, blindHostnameVerifier());
-        clientBuilder.setSSLSocketFactory(sslsf);
-        clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
+        private static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
+            SSLContext sslContext = SSLContexts
+                    .custom()
+                    .loadTrustMaterial(new BlindTrustStrategy())
+                    .build();
+            clientBuilder.setSSLContext(sslContext);
+            SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, blindHostnameVerifier());
+            clientBuilder.setSSLSocketFactory(sslsf);
+            clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
+        }
+
     }
 
     protected static javax.net.ssl.HostnameVerifier blindHostnameVerifier() {
