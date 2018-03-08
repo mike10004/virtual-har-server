@@ -106,8 +106,7 @@ public abstract class VirtualHarServerTestBase {
     public void httpsTest() throws Exception {
         TestContext context = new TestContext();
         context.put(KEY_TLS_MODE, TlsMode.SUPPORT_REQUIRED);
-        Supplier<BlindlyTrustingClient> clientSupplier = BlindlyTrustingClient::new;
-        context.put(KEY_CLIENT_SUPPLIER, clientSupplier);
+        context.put(KEY_CLIENT_SUPPLIER, BlindlyTrustingClient.supplier());
         doHttpsTest(context);
     }
 
@@ -207,6 +206,10 @@ public abstract class VirtualHarServerTestBase {
 
         public BlindlyTrustingClient() {
             super(false);
+        }
+
+        public static Supplier<ApacheRecordingClient> supplier() {
+            return BlindlyTrustingClient::new;
         }
 
         @Override

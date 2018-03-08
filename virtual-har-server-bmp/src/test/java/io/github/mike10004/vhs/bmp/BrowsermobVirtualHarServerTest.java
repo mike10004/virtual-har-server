@@ -2,24 +2,31 @@ package io.github.mike10004.vhs.bmp;
 
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.HttpHeaders;
 import com.machinepublishers.jbrowserdriver.JBrowserDriver;
 import com.machinepublishers.jbrowserdriver.ProxyConfig;
 import com.machinepublishers.jbrowserdriver.Settings;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.model.HarEntry;
+import io.github.mike10004.vhs.BasicHeuristic;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryMatcherFactory;
 import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
+import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
+import io.github.mike10004.vhs.bmp.ResponseManufacturingFiltersSource.PassthruPredicate;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
+import io.github.mike10004.vhs.testsupport.Tests;
 import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
@@ -33,6 +40,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
 import java.io.File;
@@ -45,12 +53,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
 
@@ -149,9 +158,11 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         doHttpsTest(context);
     }
 
+    private static final String SELF_SIGNED_URL_STR = "https://self-signed.badssl.com/";
+
     private void checkSelfSignedRequiresTrustConfig(ApacheRecordingClient client) throws Exception {
         try {
-            client.collectResponses(Collections.singleton(URI.create("https://self-signed.badssl.com/")), null);
+            client.collectResponses(Collections.singleton(URI.create(SELF_SIGNED_URL_STR)), null);
             throw new IllegalStateException("if we're here it means the client wrongly trusted an unknown self-signed certificate");
         } catch (javax.net.ssl.SSLHandshakeException ignore) {
         }
@@ -265,8 +276,45 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         };
     }
 
+    private static String getHost(HttpRequest request) {
+        String host = request.headers().get(HttpHeaders.HOST);
+        if (host == null) {
+            throw new IllegalArgumentException(String.format("no Host header in request %s %s", request.getMethod(), request.getUri()));
+        }
+        return HostAndPort.fromString(host).getHost(); // clean port value if it exists
+    }
+
     @Test
-    public void https_rejectUpstreamBadCertificate() {
-        fail("not yet implemented");
+    public void https_rejectUpstreamBadCertificate() throws Exception {
+        Path temporaryDirectory = temporaryFolder.newFolder().toPath();
+        File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
+        EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
+        int port = Tests.findOpenPort();
+        TestContext context = new TestContext()
+                .put(KEY_TLS_MODE, TlsMode.SUPPORT_REQUIRED)
+                .put(KEY_CLIENT_SUPPLIER, BlindlyTrustingClient.supplier());
+        BrowsermobVhsConfig config = createServerConfig(port, harFile, entryMatcherFactory, context);
+        URI selfSignedUrl = URI.create(SELF_SIGNED_URL_STR);
+        VirtualHarServer server = new BrowsermobVirtualHarServer(config) {
+            @Override
+            protected PassthruPredicate createPassthruPredicate() {
+                return new PassthruPredicate() {
+                    @Override
+                    public boolean isForwardable(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx) {
+                        String host = getHost(originalRequest);
+                        return selfSignedUrl.getHost().equals(host);
+                    }
+                };
+            }
+        };
+        Multimap<URI, ResponseSummary> responses;
+        try (VirtualHarServerControl ctrl = server.start()) {
+            Supplier<ApacheRecordingClient> clientFactory = context.get(KEY_CLIENT_SUPPLIER);
+            ApacheRecordingClient client = clientFactory.get();
+            responses = client.collectResponses(Collections.singleton(selfSignedUrl), ctrl.getSocketAddress());
+        }
+        checkState(responses.size() == 1, "num responses: %s", responses);
+        ResponseSummary response = responses.values().iterator().next();
+        assertTrue("status " + response.statusLine, response.statusLine.getStatusCode() >= 500);
     }
 }
