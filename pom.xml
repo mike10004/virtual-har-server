@@ -98,6 +98,10 @@
                 <plugin>
                     <artifactId>maven-javadoc-plugin</artifactId>
                     <version>3.0.0</version>
+                    <configuration>
+                        <doclint>none</doclint>
+                        <excludePackageNames>io.github.mike10004.vhs.bmp.repackaged.fi.iki</excludePackageNames>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <artifactId>maven-gpg-plugin</artifactId>
