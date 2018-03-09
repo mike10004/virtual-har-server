@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.github.mike10004.nativehelper.Whicher;
 import com.github.mike10004.nativehelper.subprocess.ProcessException;
 import com.github.mike10004.nativehelper.subprocess.ProcessResult;
 import com.github.mike10004.nativehelper.subprocess.ScopedProcessTracker;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.util.Random;
 import java.util.function.Function;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -134,7 +136,7 @@ public class KeyExports {
     public static void main(String[] args) throws Exception {
         Random random = new Random(KeyExports.class.getName().hashCode());
         MemorySecurityProviderTool securityProviderTool = new MemorySecurityProviderTool();
-        KeystoreGenerator generator = new KeystoreGenerator(KeystoreType.JKS, securityProviderTool, random);
+        KeystoreGenerator generator = new JreKeystoreGenerator(KeystoreType.JKS, securityProviderTool, random);
         KeystoreData keystoreData = generator.generate();
         Path outputDir = java.nio.file.Files.createTempDirectory("key-exports");
         KeyExports exports = new KeyExports(keystoreData);
@@ -146,5 +148,67 @@ public class KeyExports {
         FileUtils.listFiles(outputDir.toFile(), null, true).forEach(file -> {
             System.out.format("%s (%d bytes)%n", file, file.length());
         });
+    }
+
+    /**
+     * Interface that provides a method to create a subprocess builder for an executable.
+     */
+    public interface ExecutableConfig {
+        /**
+         * Creates a new subprocess builder.
+         * @return the builder
+         */
+        Subprocess.Builder subprocessBuilder();
+
+        /**
+         * Checks whether the executable is available.
+         * Checks whether the executable is available.
+         * @return true if the executable is executable
+         */
+        boolean isExecutableAvailable();
+
+        class BasicExecutableConfig implements ExecutableConfig {
+            @Nullable
+            private final File executablePathname;
+            private final String executableFilename;
+
+            BasicExecutableConfig(@Nullable File executablePathname, String executableFilename) {
+                this.executablePathname = executablePathname;
+                this.executableFilename = executableFilename;
+                checkArgument(executablePathname != null || executableFilename != null);
+            }
+
+            protected Whicher getWhicher() {
+                return Whicher.gnu();
+            }
+
+            @Override
+            public boolean isExecutableAvailable() {
+                if (executablePathname != null) {
+                    if (executablePathname.isFile() && executablePathname.canExecute()) {
+                        return true;
+                    }
+                }
+                return getWhicher().which(executableFilename).isPresent();
+            }
+
+            @Override
+            public Subprocess.Builder subprocessBuilder() {
+                if (executablePathname == null) {
+                    return Subprocess.running(executableFilename);
+                } else {
+                    return Subprocess.running(executablePathname);
+                }
+            }
+
+        }
+
+        static ExecutableConfig byNameOnly(String executableName) {
+            return new BasicExecutableConfig(null, executableName);
+        }
+
+        static ExecutableConfig byPathOnly(File executableFile) {
+            return new BasicExecutableConfig(executableFile, null);
+        }
     }
 }
