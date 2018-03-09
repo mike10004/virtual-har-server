@@ -114,7 +114,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         if (tlsMode == TlsMode.SUPPORT_REQUIRED || tlsMode == TlsMode.PREDEFINED_CERT_SUPPORT) {
             try {
                 String commonName = "localhost";
-                KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate(commonName);
+                KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest(commonName);
                 SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
                 TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
                 configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null));
@@ -152,8 +152,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
 
     @Test
     public void httpsTest_pregeneratedMitmCertificate() throws Exception {
-        KeystoreGenerator keystoreGenerator = new KeystoreGenerator(KeystoreType.PKCS12);
-        KeystoreData keystoreData = keystoreGenerator.generate();
+        KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest(null);
         CertAwareClient client = new CertAwareClient(keystoreData);
         checkSelfSignedRequiresTrustConfig(client);
         TestContext context = new TestContext();
@@ -231,7 +230,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             }
         };
         HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList(), errorResponseAccumulator);
-        KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate("localhost");
+        KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest("localhost");
         SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
         TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
         BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(manufacturer)
