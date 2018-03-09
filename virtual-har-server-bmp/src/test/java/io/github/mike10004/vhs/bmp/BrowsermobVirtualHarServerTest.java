@@ -30,6 +30,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
+import net.lightbody.bmp.mitm.TrustSource;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -115,8 +116,8 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
                 String commonName = "localhost";
                 KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate(commonName);
                 SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
-                TrustConfig trustConfig = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
-                configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustConfig, null));
+                TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
+                configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null));
             } catch (GeneralSecurityException e) {
                 throw new RuntimeException(e);
             }
@@ -232,10 +233,10 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList(), errorResponseAccumulator);
         KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate("localhost");
         SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
-        TrustConfig trustConfig = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
+        TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
         BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(manufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
-                .tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustConfig, null))
+                .tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null))
                 .build();
         VirtualHarServer server = new BrowsermobVirtualHarServer(config);
         String finalPageSource = null;

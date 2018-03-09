@@ -6,14 +6,11 @@ import io.netty.handler.codec.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public interface HostRewriter {
+interface HostRewriter {
 
     void replaceHost(HttpRequest request);
 
-    static HostRewriter from(HostAndPort replacement, boolean useLoopbackAddressInsteadOfLocalhost) {
-        if (useLoopbackAddressInsteadOfLocalhost && "localhost".equals(replacement.getHost())) {
-            replacement = HostAndPort.fromParts("127.0.0.1", replacement.getPort());
-        }
+    static HostRewriter from(HostAndPort replacement) {
         String rewrittenHost = replacement.toString();
         return new HostRewriter() {
 

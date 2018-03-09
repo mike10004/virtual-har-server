@@ -72,7 +72,7 @@ class BrokenTlsEndpoint implements TlsEndpoint {
 
     @Nullable
     @Override
-    public TrustConfig getTrustConfig() {
-        return TrustConfig.fromSource(TrustSource.defaultTrustSource());
+    public TrustSource getTrustConfig() {
+        return TrustSource.defaultTrustSource();
     }
 }

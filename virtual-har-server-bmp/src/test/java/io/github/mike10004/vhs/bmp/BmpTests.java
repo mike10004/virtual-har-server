@@ -17,6 +17,8 @@ import java.util.List;
 
 public class BmpTests {
 
+    private BmpTests() {}
+
     public static HarReplayManufacturer createManufacturer(File harFile, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) throws IOException {
         List<HarEntry> entries;
         try {
@@ -33,4 +35,5 @@ public class BmpTests {
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
         return new HarReplayManufacturer(entryMatcher, responseInterceptors, responseListener);
     }
+
 }

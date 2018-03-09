@@ -4,7 +4,6 @@ import com.google.common.net.HostAndPort;
 import io.github.mike10004.vhs.bmp.BrowsermobVhsConfig.TlsEndpointFactory;
 import io.github.mike10004.vhs.bmp.repackaged.fi.iki.elonen.NanoHTTPD;
 import net.lightbody.bmp.mitm.TrustSource;
-import net.lightbody.bmp.mitm.util.TrustUtil;
 
 import javax.annotation.Nullable;
 import javax.net.ssl.KeyManagerFactory;
@@ -15,27 +14,24 @@ import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
 
     private SSLServerSocketFactory socketFactory;
-    private TrustConfig trustConfig;
+    private TrustSource trustSource;
     @Nullable
     private Integer port;
 
-    public NanohttpdTlsEndpointFactory(SSLServerSocketFactory socketFactory, TrustConfig trustConfig, @Nullable Integer port) {
+    public NanohttpdTlsEndpointFactory(SSLServerSocketFactory socketFactory, TrustSource trustSource, @Nullable Integer port) {
         this.socketFactory = requireNonNull(socketFactory, "socketFactory");
-        this.trustConfig = requireNonNull(trustConfig, "trustConfig");
+        this.trustSource = requireNonNull(trustSource, "trustSource");
         this.port = port;
     }
 
@@ -70,34 +66,10 @@ public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
         return sc.getServerSocketFactory();
     }
 
-    public static TrustConfig createTrustConfig(KeystoreData keystoreData) throws IOException, GeneralSecurityException {
-//        return createBestTrustConfig(keystoreData);
-        return createTrustConfigFromCertificates(keystoreData);
-    }
-
-    static TrustConfig createBestTrustConfig(KeystoreData keystoreData) throws IOException, GeneralSecurityException {
-        return TrustConfig.fromManagerFactory(SelectiveTrustManagerFactory.createDefaultPlusCustom(keystoreData));
-    }
-
-    static TrustConfig createInsecureTrustConfig() {
-        return TrustConfig.totallyInsecure();
-    }
-
-    @SuppressWarnings("CollectionAddAllCanBeReplacedWithConstructor")
-    static TrustConfig createTrustConfigFromCertificates(KeystoreData keystoreData) throws GeneralSecurityException, IOException {
-        List<X509Certificate> allCertificates = new ArrayList<>();
-        List<X509Certificate> defaultCerts = Arrays.asList(TrustSource.defaultTrustSource().getTrustedCAs());
-        allCertificates.addAll(defaultCerts);
-        List<X509Certificate> keystoreCerts = createCertificates(keystoreData);
-        allCertificates.addAll(keystoreCerts);
-        return TrustConfig.fromCertificates(allCertificates);
-    }
-
-    static List<X509Certificate> createCertificates(KeystoreData keystoreData) throws GeneralSecurityException, IOException {
-        return Collections.singletonList(keystoreData.asCertificateAndKeySource().load().getCertificate());
-//        return TrustUtil.extractTrustedCertificateEntries(keystoreData.loadKeystore());
-//                .stream().map(cert -> adjust(cert))
-//                .collect(Collectors.toList());
+    @SuppressWarnings("RedundantThrows")
+    public static TrustSource createTrustConfig(KeystoreData keystoreData) throws IOException, GeneralSecurityException {
+        return TrustSource.defaultTrustSource()
+                .add(keystoreData.asCertificateAndKeySource().load().getCertificate());
     }
 
     private class NanoEndpoint implements TlsEndpoint {
@@ -125,8 +97,8 @@ public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
 
         @Nullable
         @Override
-        public TrustConfig getTrustConfig() {
-            return trustConfig;
+        public TrustSource getTrustConfig() {
+            return trustSource;
         }
     }
 
