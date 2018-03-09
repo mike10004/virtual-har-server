@@ -28,7 +28,7 @@ public class BmpTests {
     private BmpTests() {}
 
     private static final KeystoreDataCache keystoreDataCache =
-            new KeystoreDataCache(new KeystoreGenerator(KeystoreGenerator.KeystoreType.PKCS12,
+            new KeystoreDataCache(new KeystoreGenerator(KeystoreType.PKCS12,
                     new MemorySecurityProviderTool(),
                     new Random(KeystoreDataCache.class.getName().hashCode())));
 

@@ -41,7 +41,7 @@ public interface KeystoreDataSerializer {
                 checkArgument(object.has(KEY_KEYSTORE_BYTES), KEY_KEYSTORE_BYTES);
                 checkArgument(object.has(KEY_KEYSTORE_TYPE), KEY_KEYSTORE_TYPE);
                 checkArgument(object.has(KEY_PRIVATE_KEY_ALIAS), KEY_PRIVATE_KEY_ALIAS);
-                KeystoreGenerator.KeystoreType keystoreType = KeystoreGenerator.KeystoreType.valueOf(object.get(KEY_KEYSTORE_TYPE).getAsString());
+                KeystoreType keystoreType = KeystoreType.valueOf(object.get(KEY_KEYSTORE_TYPE).getAsString());
                 char[] keystorePassword = object.get(KEY_KEYSTORE_PASSWORD).getAsString().toCharArray();
                 String keystoreBytesBase64 = object.get(KEY_KEYSTORE_BYTES).getAsString();
                 byte[] keystoreBytes = keystoreBytesEncoding.decode(keystoreBytesBase64);

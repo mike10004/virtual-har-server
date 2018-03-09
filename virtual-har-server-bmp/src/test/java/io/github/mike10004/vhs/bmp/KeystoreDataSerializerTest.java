@@ -20,7 +20,7 @@ public class KeystoreDataSerializerTest {
     }
 
     private KeystoreData create() {
-        KeystoreGenerator.KeystoreType keystoreType = KeystoreGenerator.KeystoreType.PKCS12;
+        KeystoreType keystoreType = KeystoreType.PKCS12;
         byte[] bytes = new byte[2048];
         random.nextBytes(bytes);
         byte[] passwordBytes = new byte[32];

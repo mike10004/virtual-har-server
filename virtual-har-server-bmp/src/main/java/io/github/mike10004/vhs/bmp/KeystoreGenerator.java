@@ -32,15 +32,6 @@ public class KeystoreGenerator {
 
     static final String KEYSTORE_PRIVATE_KEY_ALIAS = "key";
 
-    /**
-     * Enumeration of keystore types. These are just the types supported
-     * by these libraries, not all types supported by the JRE.
-     */
-    public enum KeystoreType {
-        PKCS12,
-        JKS
-    }
-
     private final Random random;
     private final KeystoreType keystoreType;
     private final MemorySecurityProviderTool securityProviderTool;

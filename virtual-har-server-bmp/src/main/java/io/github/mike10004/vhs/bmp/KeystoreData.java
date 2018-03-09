@@ -22,19 +22,19 @@ public class KeystoreData {
 
     private static final Logger log = LoggerFactory.getLogger(KeystoreData.class);
 
-    public final KeystoreGenerator.KeystoreType keystoreType;
+    public final KeystoreType keystoreType;
     public final byte[] keystoreBytes;
     public final String privateKeyAlias;
     public final char[] keystorePassword;
 
-    public KeystoreData(KeystoreGenerator.KeystoreType keystoreType, byte[] keystoreBytes, String privateKeyAlias, char[] keystorePassword) {
+    public KeystoreData(KeystoreType keystoreType, byte[] keystoreBytes, String privateKeyAlias, char[] keystorePassword) {
         this.keystoreBytes = requireNonNull(keystoreBytes);
         this.privateKeyAlias = requireNonNull(privateKeyAlias);
         this.keystorePassword = keystorePassword;
         this.keystoreType = requireNonNull(keystoreType);
     }
 
-    private static CertificateAndKey loadKeyStore(MemorySecurityProviderTool securityProviderTool, byte[] keyStoreBytes, KeystoreGenerator.KeystoreType keystoreType, String privateKeyAlias, char[] keyStorePasswordChars) {
+    private static CertificateAndKey loadKeyStore(MemorySecurityProviderTool securityProviderTool, byte[] keyStoreBytes, KeystoreType keystoreType, String privateKeyAlias, char[] keyStorePasswordChars) {
         final KeyStore keyStore = securityProviderTool.loadKeyStore(keyStoreBytes, keystoreType.name(), keyStorePasswordChars);
         KeyStoreCertificateSource keyStoreCertificateSource = new KeyStoreCertificateSource(keyStore, privateKeyAlias, String.copyValueOf(keyStorePasswordChars));
         return keyStoreCertificateSource.load();
@@ -65,7 +65,7 @@ public class KeystoreData {
 
         private final Supplier<CertificateAndKey> certificateAndKey;
 
-        public MemoryKeyStoreCertificateSource(KeystoreGenerator.KeystoreType keystoreType, byte[] keystoreBytes, String privateKeyAlias, char[] keyStorePassword) {
+        public MemoryKeyStoreCertificateSource(KeystoreType keystoreType, byte[] keystoreBytes, String privateKeyAlias, char[] keyStorePassword) {
             certificateAndKey = Suppliers.memoize(() -> {
                 MemorySecurityProviderTool securityProviderTool = new MemorySecurityProviderTool();
                 log.debug("loading and memoizing keystore of type {} with key at alias {}", keystoreType, privateKeyAlias);

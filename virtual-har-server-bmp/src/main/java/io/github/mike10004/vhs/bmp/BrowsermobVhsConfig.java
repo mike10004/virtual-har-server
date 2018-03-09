@@ -11,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 
 public class BrowsermobVhsConfig {
 
-    static final KeystoreGenerator.KeystoreType DEFAULT_KEYSTORE_TYPE = KeystoreGenerator.KeystoreType.PKCS12;
+    static final KeystoreType DEFAULT_KEYSTORE_TYPE = KeystoreType.PKCS12;
 
     @Nullable
     public final Integer port;
