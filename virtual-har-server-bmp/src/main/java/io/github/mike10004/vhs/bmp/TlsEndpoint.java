@@ -7,13 +7,22 @@ import java.io.IOException;
 
 /**
  * Interface that provides access to the socket address where TLS
- * connections should be forwarded.
+ * connections are to be forwarded.
  */
 public interface TlsEndpoint extends java.io.Closeable {
 
+    /**
+     * Gets the socket address.
+     * @return the socket address
+     */
     HostAndPort getSocketAddress();
 
-    TrustSource getTrustConfig();
+    /**
+     * Gets the trust source the proxy can use so that the "remote" connection
+     * handshake succeeds.
+     * @return the trust source
+     */
+    TrustSource getTrustSource();
 
     static TlsEndpoint createDefault() throws IOException {
         return new BrokenTlsEndpoint();

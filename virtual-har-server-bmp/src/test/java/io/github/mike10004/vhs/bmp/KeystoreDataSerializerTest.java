@@ -1,7 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
 import com.google.common.io.BaseEncoding;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import org.junit.Test;
 
 import java.util.Random;
@@ -21,7 +20,7 @@ public class KeystoreDataSerializerTest {
     }
 
     private KeystoreData create() {
-        KeystoreType keystoreType = KeystoreType.PKCS12;
+        KeystoreGenerator.KeystoreType keystoreType = KeystoreGenerator.KeystoreType.PKCS12;
         byte[] bytes = new byte[2048];
         random.nextBytes(bytes);
         byte[] passwordBytes = new byte[32];

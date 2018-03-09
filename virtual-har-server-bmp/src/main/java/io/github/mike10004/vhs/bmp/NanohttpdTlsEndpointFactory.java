@@ -14,14 +14,13 @@ import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Factory that produces a TLS endpoint that accepts TLS connections
+ * as a normal web server would.
+ */
 public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
 
     private SSLServerSocketFactory socketFactory;
@@ -49,11 +48,19 @@ public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
         }
     }
 
-    private class NanoServer extends NanoHTTPD {
-
-        public NanoServer(int port) {
-            super(port);
-        }
+    /**
+     * Creates a factory that constructs an instance with SSL server socket factory
+     * and trust source generated from the same keystore data.
+     * @param keystoreData the keystore data
+     * @param port the port
+     * @return the factory
+     * @throws IOException on I/O error
+     * @throws GeneralSecurityException on security error
+     */
+    public static NanohttpdTlsEndpointFactory create(KeystoreData keystoreData, @Nullable Integer port) throws IOException, GeneralSecurityException {
+        SSLServerSocketFactory sslServerSocketFactory = createSSLServerSocketFactory(keystoreData);
+        TrustSource trustSource = createTrustSource(keystoreData);
+        return new NanohttpdTlsEndpointFactory(sslServerSocketFactory, trustSource, port);
     }
 
     public static SSLServerSocketFactory createSSLServerSocketFactory(KeystoreData keystoreData) throws IOException, GeneralSecurityException {
@@ -67,19 +74,32 @@ public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
     }
 
     @SuppressWarnings("RedundantThrows")
-    public static TrustSource createTrustConfig(KeystoreData keystoreData) throws IOException, GeneralSecurityException {
+    public static TrustSource createTrustSource(KeystoreData keystoreData) throws IOException, GeneralSecurityException {
         return TrustSource.defaultTrustSource()
                 .add(keystoreData.asCertificateAndKeySource().load().getCertificate());
     }
 
+    private class NanoServer extends NanoHTTPD {
+
+        public NanoServer(int port) {
+            super(port);
+        }
+
+    }
+
+    protected NanoHTTPD createServer(int port) {
+        NanoHTTPD server = new NanoServer(port);
+        server.makeSecure(socketFactory, null);
+        return server;
+    }
+
     private class NanoEndpoint implements TlsEndpoint {
 
-        private NanoServer server;
+        private NanoHTTPD server;
         private HostAndPort socketAddress;
 
         public NanoEndpoint(int port) throws IOException {
-            server = new NanoServer(port);
-            server.makeSecure(socketFactory, null);
+            server = createServer(port);
             server.start();
             socketAddress = HostAndPort.fromParts("localhost", server.getListeningPort());
         }
@@ -97,7 +117,7 @@ public class NanohttpdTlsEndpointFactory implements TlsEndpointFactory {
 
         @Nullable
         @Override
-        public TrustSource getTrustConfig() {
+        public TrustSource getTrustSource() {
             return trustSource;
         }
     }

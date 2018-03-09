@@ -12,7 +12,6 @@ import io.github.mike10004.vhs.EntryParser;
 import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.ResponseInterceptor;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 
 import javax.annotation.Nullable;
@@ -29,7 +28,7 @@ public class BmpTests {
     private BmpTests() {}
 
     private static final KeystoreDataCache keystoreDataCache =
-            new KeystoreDataCache(new KeystoreGenerator(KeystoreType.PKCS12,
+            new KeystoreDataCache(new KeystoreGenerator(KeystoreGenerator.KeystoreType.PKCS12,
                     new MemorySecurityProviderTool(),
                     new Random(KeystoreDataCache.class.getName().hashCode())));
 

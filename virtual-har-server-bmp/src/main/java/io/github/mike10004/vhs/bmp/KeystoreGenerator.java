@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.google.common.annotations.VisibleForTesting;
 import net.lightbody.bmp.mitm.CertificateAndKey;
 import net.lightbody.bmp.mitm.CertificateInfo;
 import net.lightbody.bmp.mitm.RootCertificateGenerator;
@@ -14,11 +15,13 @@ import java.net.UnknownHostException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Random;
 import java.util.function.Supplier;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class KeystoreGenerator {
@@ -29,7 +32,10 @@ public class KeystoreGenerator {
 
     static final String KEYSTORE_PRIVATE_KEY_ALIAS = "key";
 
-    @SuppressWarnings("unused")
+    /**
+     * Enumeration of keystore types. These are just the types supported
+     * by these libraries, not all types supported by the JRE.
+     */
     public enum KeystoreType {
         PKCS12,
         JKS
@@ -58,12 +64,25 @@ public class KeystoreGenerator {
         return generate(null);
     }
 
+    @VisibleForTesting
+    static char[] asciiBytesToChars(byte[] asciiBytes) {
+        char[] chars = new char[asciiBytes.length];
+        for (int i = 0; i < chars.length; i++) {
+            checkArgument(asciiBytes[i] >= 0 && asciiBytes[i] < 128, "char at index %s is not ascii: %s", i, asciiBytes[i]);
+            chars[i] = (char) asciiBytes[i];
+        }
+        return chars;
+    }
+
     public KeystoreData generate(@Nullable String certificateCommonName) throws IOException {
         byte[] bytes = new byte[PASSWORD_GENERATION_BYTE_LENGTH];
         random.nextBytes(bytes);
-        String password = Base64.getEncoder().encodeToString(bytes);
+        byte[] asciiBytes = Base64.getEncoder().encode(bytes);
+        Arrays.fill(bytes, (byte) 0);
+        char[] password = asciiBytesToChars(asciiBytes);
+        Arrays.fill(asciiBytes, (byte) 0);
         byte[] keystoreBytes = doGenerate(KEYSTORE_PRIVATE_KEY_ALIAS, password, certificateCommonName);
-        return new KeystoreData(keystoreType, keystoreBytes, KEYSTORE_PRIVATE_KEY_ALIAS, password.toCharArray());
+        return new KeystoreData(keystoreType, keystoreBytes, KEYSTORE_PRIVATE_KEY_ALIAS, password);
     }
 
     private static final int PASSWORD_GENERATION_BYTE_LENGTH = 32;
@@ -109,7 +128,7 @@ public class KeystoreGenerator {
         return defaultCN.length() <= 64 ? defaultCN : defaultCN.substring(0, 63);
     }
 
-    protected byte[] doGenerate(String privateKeyAlias, String keystorePassword, @Nullable String commonName) throws IOException {
+    protected byte[] doGenerate(String privateKeyAlias, char[] keystorePassword, @Nullable String commonName) throws IOException {
         RootCertificateGenerator rootCertificateGenerator = buildCertificateGenerator(commonName);
         byte[] keystoreBytes = saveRootCertificateAndKey(rootCertificateGenerator.load(),
                 privateKeyAlias, keystorePassword);
@@ -125,7 +144,7 @@ public class KeystoreGenerator {
      */
     private byte[] saveRootCertificateAndKey(CertificateAndKey certificateAndKey,
                                           String privateKeyAlias,
-                                          String password) throws IOException {
+                                          char[] password) throws IOException {
         KeyStore keyStore = securityProviderTool.createRootCertificateKeyStore(keystoreType.name(), certificateAndKey, privateKeyAlias, password);
         ByteArrayOutputStream baos = new ByteArrayOutputStream(KEYSTORE_BUFFER_LEN);
         securityProviderTool.saveKeyStore(baos, keyStore, password);

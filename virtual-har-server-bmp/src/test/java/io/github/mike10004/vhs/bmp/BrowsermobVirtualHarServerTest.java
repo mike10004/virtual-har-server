@@ -20,7 +20,6 @@ import io.github.mike10004.vhs.HarBridgeEntryParser;
 import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import io.github.mike10004.vhs.bmp.ResponseManufacturingFiltersSource.PassthruPredicate;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
@@ -30,7 +29,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
-import net.lightbody.bmp.mitm.TrustSource;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -43,7 +41,6 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLServerSocketFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -115,9 +112,8 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             try {
                 String commonName = "localhost";
                 KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest(commonName);
-                SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
-                TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
-                configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null));
+                NanohttpdTlsEndpointFactory tlsEndpointFactory = NanohttpdTlsEndpointFactory.create(keystoreData, null);
+                configBuilder.tlsEndpointFactory(tlsEndpointFactory);
             } catch (GeneralSecurityException e) {
                 throw new RuntimeException(e);
             }
@@ -231,11 +227,10 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         };
         HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList(), errorResponseAccumulator);
         KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest("localhost");
-        SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
-        TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
+        NanohttpdTlsEndpointFactory tlsEndpointFactory = NanohttpdTlsEndpointFactory.create(keystoreData, null);
         BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(manufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
-                .tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null))
+                .tlsEndpointFactory(tlsEndpointFactory)
                 .build();
         VirtualHarServer server = new BrowsermobVirtualHarServer(config);
         String finalPageSource = null;
@@ -324,5 +319,14 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         assertEquals("status " + badSslResponse.statusLine, HttpStatus.SC_BAD_GATEWAY, badSslResponse.statusLine.getStatusCode());
         ResponseSummary goodResponse = responses.get(goodUrl).iterator().next();
         assertEquals("status from good URL response", HttpStatus.SC_OK, goodResponse.statusLine.getStatusCode());
+    }
+
+    @Test
+    public void httpsWithoutCustomTlsEndpointFails() throws Exception {
+        URI httpsUri = new URIBuilder(getBasicUri1()).setScheme("https").build();
+        Multimap<URI, ResponseSummary> responses = doBasicTest(Collections.singleton(httpsUri));
+        assertEquals("num responses", 1, responses.size());
+        ResponseSummary response = responses.values().iterator().next();
+        assertEquals("response status", HttpStatus.SC_BAD_GATEWAY, response.statusLine.getStatusCode());
     }
 }

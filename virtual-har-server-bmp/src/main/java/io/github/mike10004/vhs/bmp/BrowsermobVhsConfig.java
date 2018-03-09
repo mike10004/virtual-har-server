@@ -1,6 +1,5 @@
 package io.github.mike10004.vhs.bmp;
 
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import org.apache.commons.io.FileUtils;
 
@@ -12,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 
 public class BrowsermobVhsConfig {
 
-    static final KeystoreType DEFAULT_KEYSTORE_TYPE = KeystoreType.PKCS12;
+    static final KeystoreGenerator.KeystoreType DEFAULT_KEYSTORE_TYPE = KeystoreGenerator.KeystoreType.PKCS12;
 
     @Nullable
     public final Integer port;

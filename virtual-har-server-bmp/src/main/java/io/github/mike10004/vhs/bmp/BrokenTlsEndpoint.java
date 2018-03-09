@@ -11,6 +11,11 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Implementation of a TLS endpoint that starts a thread that accepts and
+ * closes all socket connections. The proxy will interpret this as a
+ * bad gateway.
+ */
 class BrokenTlsEndpoint implements TlsEndpoint {
 
     private static final long LISTENING_THREAD_JOIN_TIMEOUT_MS = 1000;
@@ -70,9 +75,14 @@ class BrokenTlsEndpoint implements TlsEndpoint {
         }
     }
 
+    /**
+     * Gets a trust source with no special customization.
+     * @return the trust source
+     * @see TrustSource#defaultTrustSource()
+     */
     @Nullable
     @Override
-    public TrustSource getTrustConfig() {
+    public TrustSource getTrustSource() {
         return TrustSource.defaultTrustSource();
     }
 }

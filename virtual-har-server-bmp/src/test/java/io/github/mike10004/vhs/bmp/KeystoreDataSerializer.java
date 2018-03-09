@@ -4,7 +4,6 @@ import com.google.common.io.BaseEncoding;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -42,7 +41,7 @@ public interface KeystoreDataSerializer {
                 checkArgument(object.has(KEY_KEYSTORE_BYTES), KEY_KEYSTORE_BYTES);
                 checkArgument(object.has(KEY_KEYSTORE_TYPE), KEY_KEYSTORE_TYPE);
                 checkArgument(object.has(KEY_PRIVATE_KEY_ALIAS), KEY_PRIVATE_KEY_ALIAS);
-                KeystoreType keystoreType = KeystoreType.valueOf(object.get(KEY_KEYSTORE_TYPE).getAsString());
+                KeystoreGenerator.KeystoreType keystoreType = KeystoreGenerator.KeystoreType.valueOf(object.get(KEY_KEYSTORE_TYPE).getAsString());
                 char[] keystorePassword = object.get(KEY_KEYSTORE_PASSWORD).getAsString().toCharArray();
                 String keystoreBytesBase64 = object.get(KEY_KEYSTORE_BYTES).getAsString();
                 byte[] keystoreBytes = keystoreBytesEncoding.decode(keystoreBytesBase64);

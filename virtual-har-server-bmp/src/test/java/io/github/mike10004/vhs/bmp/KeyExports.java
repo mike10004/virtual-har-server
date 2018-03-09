@@ -7,7 +7,6 @@ import com.github.mike10004.nativehelper.subprocess.Subprocess;
 import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
 import io.github.mike10004.vhs.bmp.KeystoreGenerator.CertificateGenerationException;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.KeystoreType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -57,7 +56,7 @@ public class KeyExports {
      * </pre>
      * <p>The contents of `exported-keystore.pem` will be in PEM format.
      */
-    public void convert(Path scratchDir, KeystoreType destType, File p12File) throws IOException, InterruptedException {
+    public void convert(Path scratchDir, KeystoreGenerator.KeystoreType destType, File p12File) throws IOException, InterruptedException {
         File keystoreFile = File.createTempFile("AutoCertificateAndKeySource", ".keystore", scratchDir.toFile());
         try {
             Files.write(onDemandSource.keystoreBytes, keystoreFile);
@@ -88,7 +87,7 @@ public class KeyExports {
     public void createPemFile(File pkcs12File, File pemFile) throws IOException, InterruptedException {
         String keystorePassword = String.copyValueOf(onDemandSource.keystorePassword);
         Subprocess subprocess = opensslConfig.subprocessBuilder()
-                .arg(KeystoreType.PKCS12.name().toLowerCase())
+                .arg(KeystoreGenerator.KeystoreType.PKCS12.name().toLowerCase())
                 .args("-in", pkcs12File.getAbsolutePath())
                 .args("-passin", "pass:" + keystorePassword)
                 .args("-out", pemFile.getAbsolutePath())
@@ -135,12 +134,12 @@ public class KeyExports {
     public static void main(String[] args) throws Exception {
         Random random = new Random(KeyExports.class.getName().hashCode());
         MemorySecurityProviderTool securityProviderTool = new MemorySecurityProviderTool();
-        KeystoreGenerator generator = new KeystoreGenerator(KeystoreType.JKS, securityProviderTool, random);
+        KeystoreGenerator generator = new KeystoreGenerator(KeystoreGenerator.KeystoreType.JKS, securityProviderTool, random);
         KeystoreData keystoreData = generator.generate();
         Path outputDir = java.nio.file.Files.createTempDirectory("key-exports");
         KeyExports exports = new KeyExports(keystoreData);
         File p12File = outputDir.resolve("keystore-keytool.pkcs12").toFile();
-        exports.convert(outputDir, KeystoreType.PKCS12, p12File);
+        exports.convert(outputDir, KeystoreGenerator.KeystoreType.PKCS12, p12File);
         File pemFile = outputDir.resolve("keystore-openssl.pem").toFile();
         exports.createPemFile(p12File, pemFile);
         // securityProviderTool.

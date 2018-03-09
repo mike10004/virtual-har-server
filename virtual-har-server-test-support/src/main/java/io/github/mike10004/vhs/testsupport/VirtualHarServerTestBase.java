@@ -58,6 +58,10 @@ public abstract class VirtualHarServerTestBase {
 
     protected abstract VirtualHarServer createServer(int port, File harFile, EntryMatcherFactory entryMatcherFactory, TestContext context) throws IOException;
 
+    protected static URI getBasicUri1() {
+        return oneUri;
+    }
+
     private static final URI oneUri = URI.create("http://example.com/one"),
             twoUri = URI.create("http://example.com/two"),
             notFoundUri = URI.create("http://example.com/not-found");
@@ -86,20 +90,23 @@ public abstract class VirtualHarServerTestBase {
 
     @Test
     public void basicTest() throws Exception {
+        List<URI> uris = Arrays.asList(
+                oneUri, twoUri, notFoundUri
+        );
+        Multimap<URI, ResponseSummary> responses = doBasicTest(uris);
+        examineResponses(uris, responses);
+    }
+
+    protected Multimap<URI, ResponseSummary> doBasicTest(Iterable<URI> uris) throws Exception {
         Path temporaryDirectory = temporaryFolder.newFolder().toPath();
         File harFile = Tests.getReplayTest1HarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         int port = Tests.findOpenPort();
         VirtualHarServer server = createServer(port, harFile, entryMatcherFactory, new TestContext().put(KEY_TLS_MODE, TlsMode.NO_SUPPORT_REQUIRED));
-        Multimap<URI, ResponseSummary> responses;
-        List<URI> uris = Arrays.asList(
-                oneUri, twoUri, notFoundUri
-        );
         try (VirtualHarServerControl ctrl = server.start()) {
             ApacheRecordingClient client = new ApacheRecordingClient(false);
-            responses = client.collectResponses(uris, ctrl.getSocketAddress());
+            return client.collectResponses(uris, ctrl.getSocketAddress());
         }
-        examineResponses(uris, responses);
     }
 
     @Test

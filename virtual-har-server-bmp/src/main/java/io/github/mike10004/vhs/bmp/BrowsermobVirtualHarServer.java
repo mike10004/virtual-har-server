@@ -52,7 +52,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
             certificateAndKeySource = config.certificateAndKeySourceFactory.produce(config, scratchPath);
             TlsEndpoint httpsInterceptionServer = config.tlsEndpointFactory.produce(config, scratchPath);
             closeables.add(httpsInterceptionServer);
-            TrustSource trustSource = httpsInterceptionServer.getTrustConfig();
+            TrustSource trustSource = httpsInterceptionServer.getTrustSource();
             proxy = startProxy(config.bmpResponseManufacturer, httpsInterceptionServer.getSocketAddress(), certificateAndKeySource, trustSource);
         } catch (RuntimeException | IOException e) {
             closeAll(closeables, true);
