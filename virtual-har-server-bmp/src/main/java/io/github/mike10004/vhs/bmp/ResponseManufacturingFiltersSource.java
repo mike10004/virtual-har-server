@@ -1,7 +1,6 @@
 package io.github.mike10004.vhs.bmp;
 
-import com.google.common.net.HostAndPort;
-import com.google.common.net.HttpHeaders;
+import com.google.common.annotations.VisibleForTesting;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
@@ -22,13 +21,13 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
     private static final Logger log = LoggerFactory.getLogger(ResponseManufacturingFiltersSource.class);
 
     private final BmpResponseManufacturer responseManufacturer;
-    private final HostAndPort httpsHostRewriteValue;
+    private final HostRewriter hostRewriter;
     private final BmpResponseFilter proxyToClientResponseFilter;
     private final PassthruPredicate passthruPredicate;
 
-    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteValue, BmpResponseFilter proxyToClientResponseFilter, PassthruPredicate passthruPredicate) {
+    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseFilter proxyToClientResponseFilter, PassthruPredicate passthruPredicate) {
         this.responseManufacturer = requireNonNull(responseManufacturer);
-        this.httpsHostRewriteValue = requireNonNull(httpsHostRewriteValue);
+        this.hostRewriter = requireNonNull(hostRewriter);
         this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
         this.passthruPredicate = requireNonNull(passthruPredicate);
     }
@@ -49,43 +48,34 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
 
     private HttpFilters doFilterRequest(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx) {
         if (passthruPredicate.isForwardable(originalRequest, ctx)) {
+            log.debug("passes through: %s %s", originalRequest.getMethod(), originalRequest.getUri());
             return null;
         }
-        String newHostHeaderValue = rewriteHostHeader();
         if (ProxyUtils.isCONNECT(originalRequest)) {
-            return new HostRewriteFilter(originalRequest, ctx, newHostHeaderValue);
+            return new HostRewriteFilter(originalRequest, ctx, hostRewriter);
         } else {
             return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
         }
     }
 
-    private static void replaceHost(HttpRequest request, String newHostHeaderValue) {
-        log.debug("replacing URI and host header {} -> {}", request.headers().get(HttpHeaders.HOST), newHostHeaderValue);
-        request.setUri(newHostHeaderValue);
-        request.headers().set(com.google.common.net.HttpHeaders.HOST, newHostHeaderValue);
-    }
+    @VisibleForTesting
+    static class HostRewriteFilter extends HttpsAwareFiltersAdapter {
 
-    private static class HostRewriteFilter extends HttpsAwareFiltersAdapter {
+        private final HostRewriter hostRewriter;
 
-        private final String rewrittenHost;
-
-        public HostRewriteFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, String rewrittenHost) {
+        public HostRewriteFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, HostRewriter hostRewriter) {
             super(originalRequest, ctx);
-            this.rewrittenHost = requireNonNull(rewrittenHost);
+            this.hostRewriter = requireNonNull(hostRewriter);
         }
 
         @Override
         public HttpResponse clientToProxyRequest(HttpObject httpObject) {
             if (httpObject instanceof HttpRequest) {
                 HttpRequest req = (HttpRequest) httpObject;
-                replaceHost(req, rewrittenHost);
+                hostRewriter.replaceHost(req);
             }
             return super.clientToProxyRequest(httpObject);
         }
-    }
-
-    protected String rewriteHostHeader() {
-        return httpsHostRewriteValue.toString();
     }
 
     @Override

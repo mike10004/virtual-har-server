@@ -14,7 +14,7 @@ public class LazyCertificateAndKeySource implements CertificateAndKeySource {
     private volatile Supplier<CertificateAndKey> memoizedCertificateAndKey;
 
     public LazyCertificateAndKeySource(KeystoreGenerator keystoreGenerator) {
-        this(keystoreGenerator.asCertificateAndKeySupplier());
+        this(keystoreGenerator.asCertificateAndKeySupplier(null));
     }
 
     public LazyCertificateAndKeySource(Supplier<CertificateAndKey> certificateAndKeySupplier) {

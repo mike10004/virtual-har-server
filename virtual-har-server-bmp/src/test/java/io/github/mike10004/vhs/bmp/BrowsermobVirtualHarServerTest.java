@@ -30,7 +30,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import net.lightbody.bmp.core.har.HarRequest;
-import net.lightbody.bmp.mitm.TrustSource;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.ssl.SSLContexts;
@@ -50,18 +50,21 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
+
+    private static final int REDIRECT_WAIT_TIMEOUT_SECONDS = 10; // JBrowserDriver can be a tad slow to execute JavaScript
+    private static final String EXPECTED_FINAL_REDIRECT_TEXT = "This is the redirect destination page";
 
     private List<String> requests;
     private List<String> customValues;
@@ -109,10 +112,11 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         TlsMode tlsMode = context.get(KEY_TLS_MODE);
         if (tlsMode == TlsMode.SUPPORT_REQUIRED || tlsMode == TlsMode.PREDEFINED_CERT_SUPPORT) {
             try {
-                KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate();
+                String commonName = "localhost";
+                KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate(commonName);
                 SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
-                TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustSource(keystoreData);
-                configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null));
+                TrustConfig trustConfig = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
+                configBuilder.tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustConfig, null));
             } catch (GeneralSecurityException e) {
                 throw new RuntimeException(e);
             }
@@ -146,7 +150,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     private static final String KEY_KEYSTORE_DATA = "keystoreData";
 
     @Test
-    public void httpsTest_pregeneratedCertificate() throws Exception {
+    public void httpsTest_pregeneratedMitmCertificate() throws Exception {
         KeystoreGenerator keystoreGenerator = new KeystoreGenerator(KeystoreType.PKCS12);
         KeystoreData keystoreData = keystoreGenerator.generate();
         CertAwareClient client = new CertAwareClient(keystoreData);
@@ -226,12 +230,12 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             }
         };
         HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList(), errorResponseAccumulator);
-        KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate();
+        KeystoreData keystoreData = new KeystoreGenerator(KeystoreType.PKCS12).generate("localhost");
         SSLServerSocketFactory serverSocketFactory = NanohttpdTlsEndpointFactory.createSSLServerSocketFactory(keystoreData);
-        TrustSource trustSource = NanohttpdTlsEndpointFactory.createTrustSource(keystoreData);
+        TrustConfig trustConfig = NanohttpdTlsEndpointFactory.createTrustConfig(keystoreData);
         BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(manufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
-                .tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustSource, null))
+                .tlsEndpointFactory(new NanohttpdTlsEndpointFactory(serverSocketFactory, trustConfig, null))
                 .build();
         VirtualHarServer server = new BrowsermobVirtualHarServer(config);
         String finalPageSource = null;
@@ -264,9 +268,6 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         assertEquals("error notices", ImmutableList.of(), errorNotices);
     }
 
-    private static final int REDIRECT_WAIT_TIMEOUT_SECONDS = 10; // JBrowserDriver can be a tad slow to execute JavaScript
-    private static final String EXPECTED_FINAL_REDIRECT_TEXT = "This is the redirect destination page";
-
     private static BmpResponseListener newLoggingResponseListener() {
         return new BmpResponseListener() {
             @Override
@@ -286,6 +287,8 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
 
     @Test
     public void https_rejectUpstreamBadCertificate() throws Exception {
+        System.out.println("https_rejectUpstreamBadCertificate");
+        System.out.println("expect some big exception stack traces in the logs for this one");
         Path temporaryDirectory = temporaryFolder.newFolder().toPath();
         File harFile = Tests.getHttpsExampleHarFile(temporaryDirectory);
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
@@ -294,27 +297,32 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
                 .put(KEY_TLS_MODE, TlsMode.SUPPORT_REQUIRED)
                 .put(KEY_CLIENT_SUPPLIER, BlindlyTrustingClient.supplier());
         BrowsermobVhsConfig config = createServerConfig(port, harFile, entryMatcherFactory, context);
-        URI selfSignedUrl = URI.create(SELF_SIGNED_URL_STR);
+        URI goodUrl = URI.create("https://sha256.badssl.com/"), selfSignedUrl = URI.create(SELF_SIGNED_URL_STR);
+        List<URI> urls = Arrays.asList(goodUrl, selfSignedUrl);
+        PassthruPredicate passthruPredicate = new PassthruPredicate() {
+            @Override
+            public boolean isForwardable(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx) {
+                String host = getHost(originalRequest);
+                return urls.stream().map(URI::getHost).anyMatch(host::equals);
+            }
+        };
         VirtualHarServer server = new BrowsermobVirtualHarServer(config) {
             @Override
             protected PassthruPredicate createPassthruPredicate() {
-                return new PassthruPredicate() {
-                    @Override
-                    public boolean isForwardable(HttpRequest originalRequest, @Nullable ChannelHandlerContext ctx) {
-                        String host = getHost(originalRequest);
-                        return selfSignedUrl.getHost().equals(host);
-                    }
-                };
+                return passthruPredicate;
             }
         };
         Multimap<URI, ResponseSummary> responses;
         try (VirtualHarServerControl ctrl = server.start()) {
             Supplier<ApacheRecordingClient> clientFactory = context.get(KEY_CLIENT_SUPPLIER);
             ApacheRecordingClient client = clientFactory.get();
-            responses = client.collectResponses(Collections.singleton(selfSignedUrl), ctrl.getSocketAddress());
+            responses = client.collectResponses(urls, ctrl.getSocketAddress());
         }
-        checkState(responses.size() == 1, "num responses: %s", responses);
-        ResponseSummary response = responses.values().iterator().next();
-        assertTrue("status " + response.statusLine, response.statusLine.getStatusCode() >= 500);
+        assertEquals("expect 1 response per URL in " + urls, urls.size(), responses.size());
+        assertTrue("all URLs represented in response map", responses.keySet().containsAll(urls));
+        ResponseSummary badSslResponse = responses.get(selfSignedUrl).iterator().next();
+        assertEquals("status " + badSslResponse.statusLine, HttpStatus.SC_BAD_GATEWAY, badSslResponse.statusLine.getStatusCode());
+        ResponseSummary goodResponse = responses.get(goodUrl).iterator().next();
+        assertEquals("status from good URL response", HttpStatus.SC_OK, goodResponse.statusLine.getStatusCode());
     }
 }

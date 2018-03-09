@@ -10,14 +10,11 @@ import io.github.mike10004.vhs.bmp.ScratchDirProvider.Scratch;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
-import net.lightbody.bmp.mitm.TrustSource;
-import net.lightbody.bmp.mitm.manager.ImpersonatingMitmManager;
 import net.lightbody.bmp.proxy.CaptureType;
 import org.littleshoot.proxy.MitmManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -53,7 +50,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
             certificateAndKeySource = config.certificateAndKeySourceFactory.produce(config, scratchPath);
             TlsEndpoint httpsInterceptionServer = config.tlsEndpointFactory.produce(config, scratchPath);
             closeables.add(httpsInterceptionServer);
-            @Nullable TrustSource trustSource = httpsInterceptionServer.getTrustSource();
+            TrustConfig trustSource = httpsInterceptionServer.getTrustConfig();
             proxy = startProxy(config.bmpResponseManufacturer, httpsInterceptionServer.getSocketAddress(), certificateAndKeySource, trustSource);
         } catch (RuntimeException | IOException e) {
             closeAll(closeables, true);
@@ -72,7 +69,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         }
     }
 
-    public BrowserMobProxy startProxy(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteDestination, CertificateAndKeySource certificateAndKeySource, @Nullable TrustSource trustSource) throws IOException {
+    public BrowserMobProxy startProxy(BmpResponseManufacturer responseManufacturer, HostAndPort httpsHostRewriteDestination, CertificateAndKeySource certificateAndKeySource, TrustConfig trustSource) throws IOException {
         BrowserMobProxy bmp = instantiateProxy();
         configureProxy(bmp, responseManufacturer, httpsHostRewriteDestination, certificateAndKeySource, config.proxyToClientResponseFilter, trustSource);
         bmp.enableHarCaptureTypes(getCaptureTypes());
@@ -85,8 +82,8 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         return bmp;
     }
 
-    protected MitmManager createMitmManager(@SuppressWarnings("unused") BrowserMobProxy proxy, CertificateAndKeySource certificateAndKeySource, TrustSource trustSource) {
-        MitmManager mitmManager = ImpersonatingMitmManager.builder()
+    protected MitmManager createMitmManager(@SuppressWarnings("unused") BrowserMobProxy proxy, CertificateAndKeySource certificateAndKeySource, TrustConfig trustSource) {
+        MitmManager mitmManager = LimitedMitmManager.builder()
                 .rootCertificateSource(certificateAndKeySource)
                 .trustSource(trustSource)
                 .build();
@@ -108,10 +105,11 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
                                   HostAndPort httpsHostRewriteDestination,
                                   CertificateAndKeySource certificateAndKeySource,
                                   BmpResponseFilter proxyToClientResponseFilter,
-                                  @Nullable TrustSource trustSource) {
+                                  TrustConfig trustSource) {
         MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource, trustSource);
         bmp.setMitmManager(mitmManager);
-        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, httpsHostRewriteDestination, proxyToClientResponseFilter, createPassthruPredicate()));
+        HostRewriter hostRewriter = HostRewriter.from(httpsHostRewriteDestination, false);
+        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, createPassthruPredicate()));
     }
 
     class BrowsermobVhsControl implements VirtualHarServerControl {
