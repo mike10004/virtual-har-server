@@ -27,11 +27,13 @@
 
 package io.github.mike10004.vhs.repackaged.org.apache.http.client.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import io.github.mike10004.vhs.repackaged.org.apache.http.message.ParserCursor;
 import io.github.mike10004.vhs.repackaged.org.apache.http.message.TokenParser;
 import io.github.mike10004.vhs.repackaged.org.apache.http.util.CharArrayBuffer;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -160,7 +162,9 @@ public class URLEncodedUtils {
      * @param charset the charset to use
      * @return encoded string
      */
-    private static String decodeFormFields (final String content, final Charset charset) {
+    @Nullable
+    @VisibleForTesting
+    static String decodeFormFields (final String content, final Charset charset) {
         if (content == null) {
             return null;
         }

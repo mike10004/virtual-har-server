@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -47,7 +48,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
     public ParsedRequest parseRequest(E harEntry) throws IOException {
         HttpMethod method = HttpMethod.valueOf(bridge.getRequestMethod(harEntry));
         URI parsedUrl = parseUrl(method, bridge.getRequestUrl(harEntry));
-        Multimap<String, String> query = parseQuery(parsedUrl);
+        Multimap<String, Optional<String>> query = parseQuery(parsedUrl);
         Multimap<String, String> indexedHeaders = indexHeaders(bridge.getRequestHeaders(harEntry));
         ByteSource bodySource = bridge.getRequestPostData(harEntry);
         byte[] body = null;
@@ -72,7 +73,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
      * @return the multimap
      */
     @Nullable
-    public Multimap<String, String> parseQuery(URI uri) {
+    public Multimap<String, Optional<String>> parseQuery(URI uri) {
         return HttpRequests.parseQuery(uri);
     }
 

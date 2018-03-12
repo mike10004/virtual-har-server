@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
@@ -57,14 +58,11 @@ class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
     protected ParsedRequest parse(HttpRequest originalRequest, HarRequest fullCapturedRequest) throws IOException {
         HttpMethod method = HttpMethod.valueOf(fullCapturedRequest.getMethod());
         URI url = URI.create(fullCapturedRequest.getUrl());
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        fullCapturedRequest.getHeaders().forEach(header -> {
-            headers.put(header.getName(), header.getValue());
-        });
-        @Nullable Multimap<String, String> query = null;
+        Multimap<String, String> headers = toMultimap(fullCapturedRequest.getHeaders());
+        @Nullable Multimap<String, Optional<String>> query = null;
         List<HarNameValuePair> queryParams = fullCapturedRequest.getQueryString();
         if (queryParams != null) {
-            query = toMultimap(queryParams);
+            query = toMultimapOfOptionals(queryParams);
         }
         @Nullable byte[] body = null;
         HarPostData postData = fullCapturedRequest.getPostData();
@@ -78,6 +76,14 @@ class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
     protected byte[] toBytes(HarPostData postData) throws IOException {
         log.warn("postData -> bytes not yet implemented");
         return null;
+    }
+
+    protected Multimap<String, Optional<String>> toMultimapOfOptionals(Iterable<? extends HarNameValuePair> nameValuePairs) {
+        Multimap<String, Optional<String>> mm = ArrayListMultimap.create();
+        nameValuePairs.forEach(pair -> {
+            mm.put(pair.getName(), Optional.ofNullable(pair.getValue()));
+        });
+        return mm;
     }
 
     protected Multimap<String, String> toMultimap(Iterable<? extends HarNameValuePair> nameValuePairs) {

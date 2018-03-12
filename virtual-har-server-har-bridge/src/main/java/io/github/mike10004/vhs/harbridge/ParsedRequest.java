@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -35,14 +36,14 @@ public abstract class ParsedRequest {
      * a {@code ?}-character but nothing after it. All keys are in original case.
      */
     @Nullable
-    public final ImmutableMultimap<String, String> query;
+    public final ImmutableMultimap<String, Optional<String>> query;
 
     /**
      * Request headers with header names normalized to lowercase.
      */
     public final ImmutableMultimap<String, String> indexedHeaders;
 
-    private ParsedRequest(HttpMethod method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders) {
+    private ParsedRequest(HttpMethod method, URI url, @Nullable Multimap<String, Optional<String>> query, Multimap<String, String> indexedHeaders) {
         this.method = requireNonNull(method);
         this.url = requireNonNull(url);
         this.query = query == null ? null : ImmutableMultimap.copyOf(query);
@@ -54,7 +55,7 @@ public abstract class ParsedRequest {
 
     public abstract InputStream openBodyStream() throws IOException;
 
-    public static ParsedRequest inMemory(HttpMethod method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
+    public static ParsedRequest inMemory(HttpMethod method, URI url, @Nullable Multimap<String, Optional<String>> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
         return new MemoryRequest(method, url, query, indexedHeaders, body);
     }
 
@@ -63,12 +64,12 @@ public abstract class ParsedRequest {
         private final ByteSource bodySource;
         private final boolean bodyPresent;
 
-        public MemoryRequest(HttpMethod method, URI url, @Nullable Multimap<String, String> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
+        public MemoryRequest(HttpMethod method, URI url, @Nullable Multimap<String, Optional<String>> query, Multimap<String, String> indexedHeaders, @Nullable byte[] body) {
             super(method, url, query, indexedHeaders);
-            if (bodyPresent = (body == null)) {
-                bodySource = ByteSource.empty();
-            } else {
+            if (bodyPresent = (body != null)) {
                 bodySource = ByteSource.wrap(Arrays.copyOf(body, body.length));
+            } else {
+                bodySource = ByteSource.empty();
             }
         }
 

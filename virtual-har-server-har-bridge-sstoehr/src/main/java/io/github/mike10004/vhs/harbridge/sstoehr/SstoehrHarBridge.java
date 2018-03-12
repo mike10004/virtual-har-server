@@ -1,8 +1,11 @@
 package io.github.mike10004.vhs.harbridge.sstoehr;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
+import com.google.common.io.CharSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import de.sstoehr.harreader.model.HarContent;
@@ -15,9 +18,13 @@ import de.sstoehr.harreader.model.HarResponse;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.Hars;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
+import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
+import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collections;
 import java.util.List;
@@ -80,11 +87,29 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         if (postData != null) {
             List<HarPostDataParam> params = postData.getParams();
             if (!params.isEmpty()) {
-                throw new UnsupportedOperationException("not yet implemented: parsing post data params");
+                String contentType = postData.getMimeType();
+                if (Strings.isNullOrEmpty(contentType)) {
+                    contentType = MediaType.FORM_DATA.toString();
+                }
+                MediaType mediaType = MediaType.parse(contentType);
+                return toByteSource(params, mediaType);
+            } else {
+                return Hars.translateRequestContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment());
             }
-            return Hars.translateRequestContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment());
         }
         return null;
+    }
+
+    private static final Charset DEFAULT_WWW_FORM_DATA_CHARSET = StandardCharsets.UTF_8;
+
+    @VisibleForTesting
+    static ByteSource toByteSource(List<HarPostDataParam> params, MediaType contentType) {
+        Charset charset = contentType.charset().or(DEFAULT_WWW_FORM_DATA_CHARSET);
+        List<NameValuePair> entries = params.stream()
+                .map(param -> NameValuePair.of(param.getName(), param.getValue()))
+                .collect(ImmutableList.toImmutableList());
+        String formString = URLEncodedUtils.format(entries, charset);
+        return CharSource.wrap(formString).asByteSource(charset);
     }
 
     @Override
