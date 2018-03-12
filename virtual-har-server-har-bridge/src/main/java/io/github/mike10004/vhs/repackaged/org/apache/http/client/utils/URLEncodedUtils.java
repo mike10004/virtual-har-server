@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 import static java.util.Objects.requireNonNull;
 
 
-@SuppressWarnings("SameParameterValue")
+@SuppressWarnings({"SameParameterValue", "Duplicates"})
 public class URLEncodedUtils {
 
     private URLEncodedUtils() {}
