@@ -25,6 +25,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -78,7 +79,7 @@ public class SstoehrHarBridgeTest {
         ResponseData responseData = bridge.getResponseData(request, entry);
         assertEquals("body size", responseBody.length, responseData.body.size());
         assertEquals(contentType, responseData.contentType);
-        assertEquals(0, responseData.headers.count());
+        assertEquals(0, responseData.headers().count());
     }
 
     @Test
@@ -153,5 +154,21 @@ public class SstoehrHarBridgeTest {
         ContentType contentType = ContentType.create(mediaType.withoutParameters().toString(), mediaType.charset().orNull());
         HttpEntity entity = new ByteArrayEntity(byteSource.read(), contentType);
         return entity;
+    }
+
+    @Test
+    public void getContenttype_absent() throws Exception {
+        HarBridge<HarEntry> bridge = new SstoehrHarBridge();
+        HarEntry entry = new HarEntry();
+        HarResponse response = new HarResponse();
+        HarContent content = new HarContent();
+        response.setContent(content);
+        entry.setResponse(response);
+        ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("https://www.example.com/"), null, ImmutableMultimap.of(), null);
+        ResponseData actual = bridge.getResponseData(request, entry);
+        assertEquals("body", 0, actual.body.read().length);
+        assertEquals("content-type", HarBridge.CONTENT_TYPE_SUBSTITUTE_VALUE, actual.contentType);
+        assertEquals("", 0, actual.headers().count());
+
     }
 }

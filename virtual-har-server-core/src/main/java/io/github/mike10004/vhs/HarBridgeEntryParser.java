@@ -5,6 +5,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
+import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
@@ -103,7 +104,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
 
     protected static HttpRespondable constructRespondable(int status, ResponseData responseData) throws IOException {
         Multimap<String, String> headers = ArrayListMultimap.create();
-        responseData.headers.forEach(header -> {
+        responseData.headers().forEach(header -> {
             headers.put(header.getKey(), header.getValue());
         });
         replaceContentLength(headers, responseData.body.size());

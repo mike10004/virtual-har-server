@@ -15,11 +15,14 @@ import de.sstoehr.harreader.model.HarPostData;
 import de.sstoehr.harreader.model.HarPostDataParam;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
+import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.Hars;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -30,41 +33,53 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
 public class SstoehrHarBridge implements HarBridge<HarEntry> {
 
-    protected HarRequest getRequest(HarEntry entry) {
-        return checkNotNull(entry.getRequest(), "request");
-    }
-
-    protected HarResponse getResponse(HarEntry entry) {
-        return checkNotNull(entry.getResponse(), "response");
-    }
-
-    protected static <E> E checkNotNull(E thing, String description) {
-        if (thing == null) {
-            throw new MissingHarFieldException(description);
-        }
-        return thing;
-    }
+    private static final Logger log = LoggerFactory.getLogger(SstoehrHarBridge.class);
 
     @Override
     public String getRequestMethod(HarEntry entry) {
-        return checkNotNull(getRequest(entry).getMethod(), "request.method").name();
+        HarRequest request = entry.getRequest();
+        if (request != null) {
+            HttpMethod method = request.getMethod();
+            if (method != null) {
+                return method.name();
+            }
+        }
+        log.info("request method not present in HAR entry");
+        return "";
     }
 
     @Override
     public String getRequestUrl(HarEntry entry) {
-        return checkNotNull(getRequest(entry).getUrl(), "request.url");
+        String url = null;
+        HarRequest request = entry.getRequest();
+        if (request != null) {
+            url = request.getUrl();
+        }
+        if (url == null) {
+            log.info("request URL not present in HAR entry");
+            url = "";
+        }
+        return url;
     }
 
     @Override
     public Stream<Map.Entry<String, String>> getRequestHeaders(HarEntry entry) {
-        return checkNotNull(getRequest(entry).getHeaders(), "request.headers").stream()
-                .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
+        HarRequest request = entry.getRequest();
+        if (request != null) {
+            List<HarHeader> headers = request.getHeaders();
+            if (headers != null) {
+                return headers.stream()
+                        .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
+            }
+        }
+        return Stream.empty();
     }
 
     @Nullable
@@ -82,19 +97,21 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     @Nullable
     @Override
     public ByteSource getRequestPostData(HarEntry entry) throws IOException {
-        HarRequest request = getRequest(entry);
-        HarPostData postData = request.getPostData();
-        if (postData != null) {
-            List<HarPostDataParam> params = postData.getParams();
-            if (!params.isEmpty()) {
-                String contentType = postData.getMimeType();
-                if (Strings.isNullOrEmpty(contentType)) {
-                    contentType = MediaType.FORM_DATA.toString();
+        HarRequest request = entry.getRequest();
+        if (request != null) {
+            HarPostData postData = request.getPostData();
+            if (postData != null) {
+                List<HarPostDataParam> params = postData.getParams();
+                if (!params.isEmpty()) {
+                    String contentType = postData.getMimeType();
+                    if (Strings.isNullOrEmpty(contentType)) {
+                        contentType = MediaType.FORM_DATA.toString();
+                    }
+                    MediaType mediaType = MediaType.parse(contentType);
+                    return toByteSource(params, mediaType);
+                } else {
+                    return Hars.translateRequestContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment());
                 }
-                MediaType mediaType = MediaType.parse(contentType);
-                return toByteSource(params, mediaType);
-            } else {
-                return Hars.translateRequestContent(postData.getMimeType(), postData.getText(), nullIfNegative(request.getBodySize()), null, postData.getComment());
             }
         }
         return null;
@@ -117,13 +134,29 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         return new ResponseData(getResponseHeaders(entry), getResponseContentType(entry), getResponseBody(request, entry));
     }
 
-    private Stream<Entry<String, String>> getResponseHeaders(HarEntry entry) {
-        return checkNotNull(getResponse(entry).getHeaders(), "response.headers").stream()
-                .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
+    @Nullable
+    private Supplier<Stream<Entry<String, String>>> getResponseHeaders(HarEntry entry) {
+        HarResponse harResponse = entry.getResponse();
+        if (harResponse != null) {
+            return () -> {
+                List<HarHeader> headers = harResponse.getHeaders();
+                if (headers != null) {
+                    return headers.stream()
+                            .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
+                } else {
+                    return Stream.empty();
+                }
+            };
+        } else {
+            return null;
+        }
     }
 
     private ByteSource getResponseBody(ParsedRequest request, HarEntry entry) throws IOException {
-        HarResponse rsp = getResponse(entry);
+        HarResponse rsp = entry.getResponse();
+        if (rsp == null) {
+            return ByteSource.empty();
+        }
         HarContent content = requireNonNull(rsp.getContent(), "response.content");
         @Nullable Long harContentSize = nullIfNegative(content.getSize());
         @Nullable Long bodySize = nullIfNegative(rsp.getBodySize());
@@ -139,18 +172,28 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         return Hars.translateResponseContent(request, contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment).body;
     }
 
+    @Nullable
     private MediaType getResponseContentType(HarEntry entry) {
-        HarResponse rsp = getResponse(entry);
-        HarContent content = checkNotNull(rsp.getContent(), "response.content");
-        String contentType = checkNotNull(content.getMimeType(), "response.content.mimeType");
-        if (contentType.isEmpty()) {
-            throw new MissingHarFieldException("response.content.mimeType");
+        HarResponse rsp = entry.getResponse();
+        if (rsp != null) {
+            HarContent content = rsp.getContent();
+            if (content != null) {
+                String contentType = content.getMimeType();
+                if (!Strings.nullToEmpty(contentType).trim().isEmpty()) {
+                    return MediaType.parse(contentType);
+                }
+            }
         }
-        return MediaType.parse(contentType);
+        return null;
     }
 
     @Override
     public int getResponseStatus(HarEntry entry) {
-        return getResponse(entry).getStatus();
+        HarResponse response = entry.getResponse();
+        if (response != null) {
+            return response.getStatus();
+        }
+        log.info("response not present in entry; returning 500 as status");
+        return 500;
     }
 }
