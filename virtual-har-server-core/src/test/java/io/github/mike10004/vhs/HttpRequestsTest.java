@@ -20,4 +20,12 @@ public class HttpRequestsTest {
         assertEquals(ImmutableMultimap.of(), q);
     }
 
+    @Test
+    public void parseQuery_paramWithNoAssignment() {
+        URI uri = URI.create("https://www.example.com/foo/bar?1234567890");
+        Multimap<?, ?> query = HttpRequests.parseQuery(uri);
+        assertNotNull(query);
+        ImmutableMultimap.copyOf(query);
+    }
+
 }
