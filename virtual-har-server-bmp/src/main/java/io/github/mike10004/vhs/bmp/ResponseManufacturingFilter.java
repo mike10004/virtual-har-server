@@ -30,6 +30,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -46,6 +47,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     private static final Logger log = LoggerFactory.getLogger(ResponseManufacturingFilter.class);
 
     private transient final Object responseLock = new Object();
+    private final transient AtomicBoolean unreachableExceptionThrown = new AtomicBoolean(false);
     private volatile boolean responseSent;
     private final HarRequest harRequest = new HarRequest();
     private final BmpResponseFilter proxyToClientResponseFilter;
@@ -289,7 +291,9 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         } else {
             log.error("should be unreachable; no request captured");
         }
-        throw new UnreachableCallbackException();
+        if (!unreachableExceptionThrown.getAndSet(true)) {
+            throw new UnreachableCallbackException();
+        }
     }
 
     @Override
