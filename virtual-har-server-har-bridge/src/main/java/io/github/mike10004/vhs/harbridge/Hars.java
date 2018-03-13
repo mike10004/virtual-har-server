@@ -40,6 +40,8 @@ public class Hars {
 
     private static final Logger log = LoggerFactory.getLogger(Hars.class);
 
+    static final MediaType CONTENT_TYPE_DEFAULT_VALUE = MediaType.OCTET_STREAM;
+
     private static final CharMatcher BASE_64_ALPHABET = CharMatcher.inRange('A', 'Z')
             .or(CharMatcher.inRange('a', 'z'))
             .or(CharMatcher.inRange('0', '9'))

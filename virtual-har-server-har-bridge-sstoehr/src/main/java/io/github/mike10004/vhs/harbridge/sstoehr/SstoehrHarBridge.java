@@ -14,6 +14,7 @@ import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
 import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.harbridge.HarBridge;
+import io.github.mike10004.vhs.harbridge.HarResponseData;
 import io.github.mike10004.vhs.harbridge.Hars;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
@@ -112,8 +113,8 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     }
 
     @Override
-    public ResponseData getResponseData(ParsedRequest request, HarEntry entry) throws IOException {
-        return new ResponseData(getResponseHeaders(entry), getResponseContentType(entry), getResponseBody(request, entry));
+    public HarResponseData getResponseData(ParsedRequest request, HarEntry entry) throws IOException {
+        return HarResponseData.of(getResponseHeaders(entry), getResponseContentType(entry), getResponseBody(request, entry));
     }
 
     @Nullable

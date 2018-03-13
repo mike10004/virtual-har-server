@@ -6,7 +6,7 @@ import com.google.common.io.ByteSource;
 import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
 import io.github.mike10004.vhs.harbridge.HarBridge;
-import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
+import io.github.mike10004.vhs.harbridge.HarResponseData;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
@@ -80,7 +80,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
     @Override
     public HttpRespondable parseResponse(ParsedRequest request, E entry) throws IOException {
         int status = bridge.getResponseStatus(entry);
-        ResponseData responseData = bridge.getResponseData(request, entry);
+        HarResponseData responseData = bridge.getResponseData(request, entry);
         return constructRespondable(status, responseData);
     }
 
@@ -121,13 +121,13 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         }
     }
 
-    protected static HttpRespondable constructRespondable(int status, ResponseData responseData) throws IOException {
+    protected static HttpRespondable constructRespondable(int status, HarResponseData responseData) throws IOException {
         Multimap<String, String> headers = ArrayListMultimap.create();
         responseData.headers().forEach(header -> {
             headers.put(header.getKey(), header.getValue());
         });
-        replaceContentLength(headers, responseData.body.size());
-        return HttpRespondable.inMemory(status, headers, responseData.contentType, responseData.body);
+        replaceContentLength(headers, responseData.getBody().size());
+        return HttpRespondable.inMemory(status, headers, responseData.getContentType(), responseData.getBody());
     }
 
 }

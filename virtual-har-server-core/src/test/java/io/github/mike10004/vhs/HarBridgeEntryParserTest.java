@@ -8,7 +8,7 @@ import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HarBridge;
-import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
+import io.github.mike10004.vhs.harbridge.HarResponseData;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.junit.Assume;
@@ -47,7 +47,7 @@ public class HarBridgeEntryParserTest {
         long originalContentLengthValue = bytes.length * 2;
         MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withCharset(charset);
         Map<String, String> originalHeaders = ImmutableMap.of(HttpHeaders.CONTENT_TYPE, contentType.toString(), HttpHeaders.CONTENT_LENGTH, String.valueOf(originalContentLengthValue));
-        HttpRespondable respondable = HarBridgeEntryParser.constructRespondable(200, new ResponseData(originalHeaders.entrySet()::stream, contentType, ByteSource.wrap(bytes)));
+        HttpRespondable respondable = HarBridgeEntryParser.constructRespondable(200, HarResponseData.of(originalHeaders.entrySet()::stream, contentType, ByteSource.wrap(bytes)));
         Multimap<String, String> headersMm = ArrayListMultimap.create();
         respondable.streamHeaders().forEach(h -> {
             headersMm.put(h.getKey(), h.getValue());
@@ -139,8 +139,8 @@ public class HarBridgeEntryParserTest {
         }
 
         @Override
-        public ResponseData getResponseData(ParsedRequest request, FakeHarEntry entry) throws IOException {
-            return new ResponseData(entry::getResponseHeaders, entry.responseContentType, ByteSource.wrap(entry.getResponseBody() == null ? new byte[0] : entry.getResponseBody()));
+        public HarResponseData getResponseData(ParsedRequest request, FakeHarEntry entry) throws IOException {
+            return HarResponseData.of(entry::getResponseHeaders, entry.responseContentType, ByteSource.wrap(entry.getResponseBody() == null ? new byte[0] : entry.getResponseBody()));
         }
     }
     

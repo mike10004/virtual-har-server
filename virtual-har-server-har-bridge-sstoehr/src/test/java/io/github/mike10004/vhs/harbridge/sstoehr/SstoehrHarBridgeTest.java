@@ -10,7 +10,7 @@ import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
 import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.harbridge.HarBridge;
-import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
+import io.github.mike10004.vhs.harbridge.HarResponseData;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -75,9 +75,9 @@ public class SstoehrHarBridgeTest {
     @Test
     public void getResponseData() throws Exception {
         ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("http://www.example.com/"), ImmutableMultimap.of(), ImmutableMultimap.of(), null);
-        ResponseData responseData = bridge.getResponseData(request, entry);
-        assertEquals("body size", responseBody.length, responseData.body.size());
-        assertEquals(contentType, responseData.contentType);
+        HarResponseData responseData = bridge.getResponseData(request, entry);
+        assertEquals("body size", responseBody.length, responseData.getBody().size());
+        assertEquals(contentType, responseData.getContentType());
         assertEquals(0, responseData.headers().count());
     }
 
@@ -164,9 +164,9 @@ public class SstoehrHarBridgeTest {
         response.setContent(content);
         entry.setResponse(response);
         ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("https://www.example.com/"), null, ImmutableMultimap.of(), null);
-        ResponseData actual = bridge.getResponseData(request, entry);
-        assertEquals("body", 0, actual.body.read().length);
-        assertEquals("content-type", HarBridge.CONTENT_TYPE_SUBSTITUTE_VALUE, actual.contentType);
+        HarResponseData actual = bridge.getResponseData(request, entry);
+        assertEquals("body", 0, actual.getBody().read().length);
+        assertEquals("content-type", HarBridge.getContentTypeDefaultValue(), actual.getContentType());
         assertEquals("", 0, actual.headers().count());
 
     }

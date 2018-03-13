@@ -6,12 +6,15 @@ import com.google.common.net.MediaType;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
  * Interface that defines the methods needed to support a HAR library.
+ * Implementations of this class should avoid throwing exceptions, because
+ * it's likely this will be used to decide how to respond to a request,
+ * and an exception will result in a default value like 'not found' that
+ * probably doesn't represent what you want to be returned if the content of
+ * a HAR is present but malformed in some way.
  * @param <E> HAR entry class
  */
 public interface HarBridge<E> {
@@ -20,7 +23,10 @@ public interface HarBridge<E> {
      * Content type value substituted when no actual content-type value is contained
      * in the HAR content object.
      */
-    MediaType CONTENT_TYPE_SUBSTITUTE_VALUE = MediaType.OCTET_STREAM;
+    static MediaType getContentTypeDefaultValue() {
+        return Hars.CONTENT_TYPE_DEFAULT_VALUE;
+    }
+
 
     /**
      * Gets the request method as a string.
@@ -47,7 +53,7 @@ public interface HarBridge<E> {
     ByteSource getRequestPostData(E entry) throws IOException;
 
     /**
-     * Gets the HTTP response status code. Usually this is a value from 100 to 599.
+     * Gets the HTTP response status code.
      * In some degenerate cases, such as a HAR collected from a user agent where
      * requests were blocked by the client (as by an ad blocker), the response
      * status may not have been set and might be a value like -1 or 0.
@@ -63,31 +69,6 @@ public interface HarBridge<E> {
      * @return the response data
      * @throws IOException on I/O error
      */
-    ResponseData getResponseData(ParsedRequest request, E entry) throws IOException;
+    HarResponseData getResponseData(ParsedRequest request, E entry) throws IOException;
 
-    /**
-     * Class representing response data.
-     */
-    class ResponseData {
-
-        private final Supplier<Stream<Map.Entry<String, String>>> headers;
-        public final MediaType contentType;
-        public final ByteSource body;
-
-        /**
-         *
-         * @param headers headers; if null, empty stream will be used
-         * @param contentType content-type; if null, {@code application/octet-stream} will be used
-         * @param body body; if null, empty byte source will be used
-         */
-        public ResponseData(@Nullable Supplier<Stream<Entry<String, String>>> headers, @Nullable MediaType contentType, @Nullable ByteSource body) {
-            this.headers = headers == null ? Stream::empty : headers;
-            this.contentType = contentType == null ? CONTENT_TYPE_SUBSTITUTE_VALUE : contentType;
-            this.body = body == null ? ByteSource.empty() : body;
-        }
-
-        public Stream<Map.Entry<String, String>> headers() {
-            return headers.get();
-        }
-    }
 }
