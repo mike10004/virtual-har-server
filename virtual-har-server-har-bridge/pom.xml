@@ -11,6 +11,19 @@
 
     <artifactId>virtual-har-server-har-bridge</artifactId>
 
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <configuration>
+                        <excludePackageNames>io.github.mike10004.vhs.repackaged.*</excludePackageNames>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>org.slf4j</groupId>

@@ -12,6 +12,8 @@ import com.google.common.io.CharSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Ints;
+import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
+import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +44,8 @@ public class Hars {
             .or(CharMatcher.inRange('a', 'z'))
             .or(CharMatcher.inRange('0', '9'))
             .or(CharMatcher.anyOf("/+="));
+
+    private static final Charset DEFAULT_WWW_FORM_DATA_CHARSET = StandardCharsets.UTF_8;
 
     static boolean isAllBase64Alphabet(String text) {
         return BASE_64_ALPHABET.matchesAllOf(text);
@@ -91,6 +95,25 @@ public class Hars {
      * if none was specified for a byte stream coming across the wire.
      */
     private static final Charset DEFAULT_HTML_CHARSET = StandardCharsets.ISO_8859_1;
+
+    @Nullable
+    public static ByteSource getRequestPostData(@Nullable List<NameValuePair> params, String contentType, String postDataText, @Nullable Long requestBodySize, @Nullable String postDataComment) throws IOException {
+        if (params != null && !params.isEmpty()) {
+            if (Strings.isNullOrEmpty(contentType)) {
+                contentType = MediaType.FORM_DATA.toString();
+            }
+            MediaType mediaType = MediaType.parse(contentType);
+            return toByteSourceFromPairs(params, mediaType);
+        } else {
+            return translateRequestContent(contentType, postDataText, requestBodySize, null, postDataComment);
+        }
+    }
+
+    static ByteSource toByteSourceFromPairs(List<NameValuePair> params, MediaType contentType) {
+        Charset charset = contentType.charset().or(DEFAULT_WWW_FORM_DATA_CHARSET);
+        String formString = URLEncodedUtils.format(params, charset);
+        return CharSource.wrap(formString).asByteSource(charset);
+    }
 
     private enum MessageDirection {
         REQUEST, RESPONSE;

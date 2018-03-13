@@ -7,7 +7,7 @@ import com.github.mike10004.nativehelper.subprocess.ScopedProcessTracker;
 import com.github.mike10004.nativehelper.subprocess.Subprocess;
 import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
-import io.github.mike10004.vhs.bmp.KeystoreGenerator.CertificateGenerationException;
+import io.github.mike10004.vhs.bmp.LazyCertificateAndKeySource.CertificateGenerationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -135,8 +135,7 @@ public class KeyExports {
 
     public static void main(String[] args) throws Exception {
         Random random = new Random(KeyExports.class.getName().hashCode());
-        MemorySecurityProviderTool securityProviderTool = new MemorySecurityProviderTool();
-        KeystoreGenerator generator = new JreKeystoreGenerator(KeystoreType.JKS, securityProviderTool, random);
+        KeystoreGenerator generator = new JreKeystoreGenerator(KeystoreType.JKS, random);
         KeystoreData keystoreData = generator.generate();
         Path outputDir = java.nio.file.Files.createTempDirectory("key-exports");
         KeyExports exports = new KeyExports(keystoreData);

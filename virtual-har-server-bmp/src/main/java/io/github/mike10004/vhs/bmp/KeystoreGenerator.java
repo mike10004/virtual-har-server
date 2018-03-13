@@ -1,14 +1,22 @@
 package io.github.mike10004.vhs.bmp;
 
-import net.lightbody.bmp.mitm.CertificateAndKey;
-
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.function.Supplier;
 
+/**
+ * Interface that defines methods to generate keystores.
+ */
 public interface KeystoreGenerator {
 
+    /**
+     * Generates keystore data with a new randomly-generated password.
+     * @param certificateCommonName the common name (CN) to be assigned to the
+     *                              certificate associated with the keystore
+     * @return the keystore data
+     * @throws IOException on I/O error
+     * @throws GeneralSecurityException if a security-related error occurs
+     */
     KeystoreData generate(@Nullable String certificateCommonName) throws IOException, GeneralSecurityException;
 
     /**
@@ -20,31 +28,11 @@ public interface KeystoreGenerator {
         return generate(null);
     }
 
-    default Supplier<CertificateAndKey> asCertificateAndKeySupplier(@Nullable String certificateCommonName) {
-        return () -> {
-            try {
-                return generate(certificateCommonName).asCertificateAndKeySource().load();
-            } catch (IOException | GeneralSecurityException e) {
-                throw new CertificateGenerationException(e);
-            }
-        };
-    }
-
-    class CertificateGenerationException extends RuntimeException {
-        public CertificateGenerationException(String message) {
-            super(message);
-        }
-
-        @SuppressWarnings("unused")
-        public CertificateGenerationException(String message, Throwable cause) {
-            super(message, cause);
-        }
-
-        public CertificateGenerationException(Throwable cause) {
-            super(cause);
-        }
-    }
-
+    /**
+     * Returns an implementation that uses the JRE's key generation facilities.
+     * @param keystoreType keystore type
+     * @return a new generator instance
+     */
     static KeystoreGenerator createJreGenerator(KeystoreType keystoreType) {
         return new JreKeystoreGenerator(keystoreType);
     }

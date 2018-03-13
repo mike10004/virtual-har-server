@@ -13,17 +13,34 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+/**
+ * Static utilty methods relating to codecs for HTTP content.
+ */
 public class HttpContentCodecs {
 
-    @SuppressWarnings("unused")
+    /**
+     * Header value indicating gzip compression.
+     */
     public static final String CONTENT_ENCODING_GZIP = "gzip";
-    @SuppressWarnings("unused")
+
+    /**
+     * Header value indicating LZW compression.
+     */
     public static final String CONTENT_ENCODING_COMPRESS = "compress";
-    @SuppressWarnings("unused")
+
+    /**
+     * Header value indicating zlib format data with 'deflate' compression algorithm.
+     */
     public static final String CONTENT_ENCODING_DEFLATE = "deflate";
-    @SuppressWarnings("unused")
+
+    /**
+     * Header value indicating no compression.
+     */
     public static final String CONTENT_ENCODING_IDENTITY = "identity";
-    @SuppressWarnings("unused")
+
+    /**
+     * Header value indicating brotli compression.
+     */
     public static final String CONTENT_ENCODING_BROTLI = "br";
 
     private HttpContentCodecs() {}
@@ -106,9 +123,9 @@ public class HttpContentCodecs {
 
     private static final ImmutableMap<String, HttpContentCodec> compressors = ImmutableMap.<String, HttpContentCodec>builder()
             .put(CONTENT_ENCODING_GZIP, new GzipCompressor())
-            .put("deflate", new ZlibCompressor())
-            .put("compress", new LzwCompressor())
-            .put("identity", HttpContentCodec.identity())
-            .put("br", new BrotliCompressor())
+            .put(CONTENT_ENCODING_DEFLATE, new ZlibCompressor())
+            .put(CONTENT_ENCODING_COMPRESS, new LzwCompressor())
+            .put(CONTENT_ENCODING_IDENTITY, HttpContentCodec.identity())
+            .put(CONTENT_ENCODING_BROTLI, new BrotliCompressor())
             .build();
 }

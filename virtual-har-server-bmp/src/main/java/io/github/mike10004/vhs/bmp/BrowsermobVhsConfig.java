@@ -68,7 +68,7 @@ public class BrowsermobVhsConfig {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
             scratchDirProvider = ScratchDirProvider.under(FileUtils.getTempDirectory().toPath());
             tlsEndpointFactory = (config, dir) -> TlsEndpoint.createDefault();
-            certificateAndKeySourceFactory = (config, dir) -> new LazyCertificateAndKeySource(KeystoreGenerator.createJreGenerator(DEFAULT_KEYSTORE_TYPE));
+            certificateAndKeySourceFactory = (config, dir) -> new LazyCertificateAndKeySource(KeystoreGenerator.createJreGenerator(DEFAULT_KEYSTORE_TYPE), null);
         }
 
         public Builder port(int port) {

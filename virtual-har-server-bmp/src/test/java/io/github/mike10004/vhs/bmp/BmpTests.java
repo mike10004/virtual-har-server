@@ -29,7 +29,6 @@ public class BmpTests {
 
     private static final KeystoreDataCache keystoreDataCache =
             new KeystoreDataCache(new JreKeystoreGenerator(KeystoreType.PKCS12,
-                    new MemorySecurityProviderTool(),
                     new Random(KeystoreDataCache.class.getName().hashCode())));
 
     private static class KeystoreDataCache {

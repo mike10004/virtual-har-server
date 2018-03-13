@@ -2,6 +2,7 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
@@ -24,9 +25,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 
 public class HarBridgeEntryParserTest {
 
@@ -36,7 +40,7 @@ public class HarBridgeEntryParserTest {
     }
 
     @Test
-    public void replaceContentLengthHeaderValue() throws Exception {
+    public void constructRespondable_replaceContentLengthHeaderValue() throws Exception {
         String data = "hello, world";
         Charset charset = StandardCharsets.UTF_8;
         byte[] bytes = data.getBytes(charset);
@@ -56,6 +60,31 @@ public class HarBridgeEntryParserTest {
         assertNotNull("final content length header not found", finalContentLengthStr);
         long finalContentLength = Long.parseLong(finalContentLengthStr);
         assertEquals("content length", bytes.length, finalContentLength);
+    }
+
+    @Test
+    public void replaceContentLengthHeaderValue_removeMultiple() throws Exception {
+        checkState("content-length".equalsIgnoreCase(HttpHeaders.CONTENT_LENGTH));
+        Multimap<String, String> headers = ArrayListMultimap.create();
+        headers.put("content-length", "100");
+        headers.put("Content-Length", "150");
+        headers.put("Content-Type", "application/octet-stream");
+        HarBridgeEntryParser.replaceContentLength(headers, null);
+        assertEquals("headers remaining", ImmutableMultimap.of("Content-Type", "application/octet-stream"), headers);
+    }
+
+    @SuppressWarnings("UnnecessaryBoxing")
+    @Test
+    public void replaceHeaderValue_noReplacementIfSameValue() throws Exception {
+        Multimap<String, Long> headers = ArrayListMultimap.create();
+        long stamp = System.currentTimeMillis();
+        Long val1 = new Long(stamp);
+        Long val2 = new Long(stamp);
+        headers.put("a", val1);
+        headers.put("b", 0L);
+        HarBridgeEntryParser.replaceHeaders(headers, "a", val2);
+        assertSame(val1, headers.get("a").iterator().next());
+        assertFalse(headers.get("b").isEmpty());
     }
 
     @Test

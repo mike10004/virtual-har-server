@@ -5,7 +5,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
-import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarBridge.ResponseData;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
@@ -85,12 +84,32 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         return constructRespondable(status, responseData);
     }
 
+    /**
+     * Replaces the content-length header.
+     * @param headers headers
+     * @param value new value
+     * @see #replaceHeaders(Multimap, String, Object)
+     */
     protected static void replaceContentLength(Multimap<String, String> headers, @Nullable Long value) {
-        Set<String> caseSensitiveKeys = headers.keySet().stream().filter(HttpHeaders.CONTENT_LENGTH::equalsIgnoreCase).collect(Collectors.toSet());
+        @Nullable String valueStr = value == null ? null : value.toString();
+        replaceHeaders(headers, HttpHeaders.CONTENT_LENGTH, valueStr);
+    }
+
+    /**
+     * Replaces or removes a header. Matches against header names case-insensitively.
+     * @param headers headers
+     * @param headerName name of header to be replaced
+     * @param value value to take over; if null, existing values will be removed and none added
+     * @param <V> value type
+     */
+    protected static <V> void replaceHeaders(Multimap<String, V> headers, String headerName, @Nullable V value) {
+        Set<String> caseSensitiveKeys = headers.keySet().stream()
+                .filter(headerName::equalsIgnoreCase)
+                .collect(Collectors.toSet());
         if (value != null && caseSensitiveKeys.size() == 1) {
-            Collection<String> vals = headers.get(caseSensitiveKeys.iterator().next());
-            if (vals.size() == 1) {
-                if (value.toString().equals(vals.iterator().next())) {
+            Collection<V> vals = headers.get(caseSensitiveKeys.iterator().next());
+            if (vals.size() == 1) { // if size > 1, we want to consolidate the entries into a single key
+                if (value.equals(vals.iterator().next())) {
                     // no replacement needed
                     return;
                 }
@@ -98,7 +117,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         }
         caseSensitiveKeys.forEach(headers::removeAll);
         if (value != null) {
-            headers.put(HttpHeaders.CONTENT_LENGTH, value.toString());
+            headers.put(headerName, value);
         }
     }
 

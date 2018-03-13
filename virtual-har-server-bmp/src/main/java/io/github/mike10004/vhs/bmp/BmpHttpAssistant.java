@@ -2,10 +2,13 @@ package io.github.mike10004.vhs.bmp;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.ByteSource;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.HttpRespondable;
+import io.github.mike10004.vhs.harbridge.Hars;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
+import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -15,6 +18,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import net.lightbody.bmp.core.har.HarNameValuePair;
 import net.lightbody.bmp.core.har.HarPostData;
+import net.lightbody.bmp.core.har.HarPostDataParam;
 import net.lightbody.bmp.core.har.HarRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +30,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
@@ -55,6 +60,7 @@ class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
                 httpResponse.getContentType(), body);
     }
 
+    @SuppressWarnings("unused")
     protected ParsedRequest parse(HttpRequest originalRequest, HarRequest fullCapturedRequest) throws IOException {
         HttpMethod method = HttpMethod.valueOf(fullCapturedRequest.getMethod());
         URI url = URI.create(fullCapturedRequest.getUrl());
@@ -67,14 +73,27 @@ class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
         @Nullable byte[] body = null;
         HarPostData postData = fullCapturedRequest.getPostData();
         if (postData != null) {
-            body = toBytes(postData);
+            body = toBytes(postData, fullCapturedRequest.getBodySize());
         }
         return ParsedRequest.inMemory(method, url, query, headers, body);
     }
 
     @Nullable
-    protected byte[] toBytes(HarPostData postData) throws IOException {
-        log.warn("postData -> bytes not yet implemented");
+    protected byte[] toBytes(HarPostData postData, @Nullable Long requestBodySize) throws IOException {
+        if (postData != null) {
+            List<HarPostDataParam> params = postData.getParams();
+            List<NameValuePair> pairs = null;
+            if (params != null) {
+                pairs = params.stream().map(p -> NameValuePair.of(p.getName(), p.getValue())).collect(Collectors.toList());
+            }
+            String contentType = postData.getMimeType();
+            String postDataText = postData.getText();
+            @Nullable String postDataComment = postData.getComment();
+            ByteSource byteSource = Hars.getRequestPostData(pairs, contentType, postDataText, requestBodySize, postDataComment);
+            if (byteSource != null) {
+                return byteSource.read();
+            }
+        }
         return null;
     }
 
@@ -94,7 +113,9 @@ class BmpHttpAssistant implements HttpAssistant<BmpRequest, HttpResponse> {
         return mm;
     }
 
-    protected HttpResponse toResponse(HttpRequest originalRequest, HarRequest fullCapturedRequest, HttpRespondable respondable) throws IOException {
+    protected HttpResponse toResponse(HttpRequest originalRequest,
+                                      @SuppressWarnings("unused") HarRequest fullCapturedRequest,
+                                      HttpRespondable respondable) throws IOException {
         HttpResponseStatus status = HttpResponseStatus.valueOf(respondable.getStatus());
         ByteArrayOutputStream baos = new ByteArrayOutputStream(maybeGetLength(respondable, 256));
         byte[] responseData;

@@ -4,6 +4,7 @@ import com.google.common.base.Suppliers;
 import net.lightbody.bmp.mitm.CertificateAndKey;
 import net.lightbody.bmp.mitm.CertificateAndKeySource;
 import net.lightbody.bmp.mitm.KeyStoreCertificateSource;
+import net.lightbody.bmp.mitm.exception.ImportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,18 +35,19 @@ public class KeystoreData {
         this.keystoreType = requireNonNull(keystoreType);
     }
 
-    private static CertificateAndKey loadKeyStore(MemorySecurityProviderTool securityProviderTool, byte[] keyStoreBytes, KeystoreType keystoreType, String privateKeyAlias, char[] keyStorePasswordChars) {
-        final KeyStore keyStore = securityProviderTool.loadKeyStore(keyStoreBytes, keystoreType.name(), keyStorePasswordChars);
+    private static CertificateAndKey loadCertificateAndKey(byte[] keyStoreBytes, KeystoreType keystoreType,
+                                                           String privateKeyAlias, char[] keyStorePasswordChars) throws CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException {
+        final KeyStore keyStore = loadKeystore(keystoreType, keyStoreBytes, keyStorePasswordChars);
         KeyStoreCertificateSource keyStoreCertificateSource = new KeyStoreCertificateSource(keyStore, privateKeyAlias, String.copyValueOf(keyStorePasswordChars));
         return keyStoreCertificateSource.load();
     }
 
     public KeyStore loadKeystore() throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-        return loadKeystore(keystoreType.name(), keystoreBytes, keystorePassword);
+        return loadKeystore(keystoreType, keystoreBytes, keystorePassword);
     }
 
-    static KeyStore loadKeystore(String keystoreType, byte[] keystoreBytes, char[] keystorePassword) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-        KeyStore keystore = KeyStore.getInstance(keystoreType);
+    private static KeyStore loadKeystore(KeystoreType keystoreType, byte[] keystoreBytes, char[] keystorePassword) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
+        KeyStore keystore = keystoreType.loadKeyStore();
         try (InputStream stream = new ByteArrayInputStream(keystoreBytes)) {
             keystore.load(stream, keystorePassword);
         }
@@ -67,9 +69,12 @@ public class KeystoreData {
 
         public MemoryKeyStoreCertificateSource(KeystoreType keystoreType, byte[] keystoreBytes, String privateKeyAlias, char[] keyStorePassword) {
             certificateAndKey = Suppliers.memoize(() -> {
-                MemorySecurityProviderTool securityProviderTool = new MemorySecurityProviderTool();
                 log.debug("loading and memoizing keystore of type {} with key at alias {}", keystoreType, privateKeyAlias);
-                return loadKeyStore(securityProviderTool, keystoreBytes, keystoreType, privateKeyAlias, keyStorePassword);
+                try {
+                    return loadCertificateAndKey(keystoreBytes, keystoreType, privateKeyAlias, keyStorePassword);
+                } catch (CertificateException | IOException | KeyStoreException | NoSuchAlgorithmException e) {
+                    throw new ImportException(e);
+                }
             });
         }
 

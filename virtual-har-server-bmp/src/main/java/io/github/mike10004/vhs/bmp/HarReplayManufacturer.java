@@ -20,6 +20,10 @@ import java.nio.charset.StandardCharsets;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Implementation of a response manufacturer that manufactures responses
+ * based on the content of a HAR file.
+ */
 public class HarReplayManufacturer implements BmpResponseManufacturer {
 
     private static final Logger log = LoggerFactory.getLogger(HarReplayManufacturer.class);
@@ -30,6 +34,12 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
     private final HttpAssistant<BmpRequest, HttpResponse> bmpAssistant;
     private final BmpResponseListener responseListener;
 
+    /**
+     * Constructs an instance.
+     * @param entryMatcher the entry matcher
+     * @param responseInterceptors a list of response interceptors
+     * @param responseListener a response listener
+     */
     public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) {
         this(entryMatcher, responseInterceptors, responseListener, new BmpHttpAssistant());
     }
