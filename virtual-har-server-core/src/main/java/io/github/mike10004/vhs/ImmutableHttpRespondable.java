@@ -14,6 +14,9 @@ import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Immutable implementation of a respondable.
+ */
 public class ImmutableHttpRespondable implements HttpRespondable {
 
     private final int status;

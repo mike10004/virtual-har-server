@@ -7,22 +7,12 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.nio.charset.Charset;
-import java.util.Set;
 
 class Encoding {
 
     private static final Logger log = LoggerFactory.getLogger(Encoding.class);
 
-    @Nullable
-    public static Charset parseCharset(@Nullable String contentType) {
-        if (contentType != null) {
-            try {
-                return MediaType.parse(contentType).charset().orNull();
-            } catch (RuntimeException ignore) {
-            }
-        }
-        return null;
-    }
+    private Encoding() {}
 
     public static boolean isTextLike(@Nullable String contentType) {
         if (contentType == null) {
@@ -45,5 +35,9 @@ class Encoding {
         return false;
     }
 
-    private static final Set<MediaType> TEXT_LIKE_TYPES = ImmutableSet.of(MediaType.JAVASCRIPT_UTF_8.withoutParameters(), MediaType.JSON_UTF_8.withoutParameters(), MediaType.CSS_UTF_8);
+    private static final ImmutableSet<MediaType> TEXT_LIKE_TYPES = ImmutableSet.<MediaType>builder()
+            .add(MediaType.JAVASCRIPT_UTF_8.withoutParameters())
+            .add(MediaType.JSON_UTF_8.withoutParameters())
+            .add(MediaType.CSS_UTF_8.withoutParameters())
+            .build();
 }

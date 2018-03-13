@@ -18,7 +18,7 @@ public class HeuristicEntryMatcherTest {
         BasicHeuristic heuristic = new BasicHeuristic();
         int threshold = BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE;
         String correctUrl = "http://example.com/page?foo=bar&baz=gaw";
-        ParsedEntry[] entries = {
+        HeuristicEntryMatcher.ParsedEntry[] entries = {
                 createEntry("GET", "http://example.com/", 200, MediaType.PLAIN_TEXT_UTF_8, "bad"),
                 createEntry("GET", "http://example.com/page?foo=bar", 200, MediaType.PLAIN_TEXT_UTF_8, "kinda bad"),
                 createEntry("GET", correctUrl, 200, MediaType.PLAIN_TEXT_UTF_8, "good"),
@@ -36,10 +36,10 @@ public class HeuristicEntryMatcherTest {
         assertEquals("content", "good", content);
     }
 
-    protected ParsedEntry createEntry(String method, String url, int status, MediaType contentType, String bodyText) {
+    protected HeuristicEntryMatcher.ParsedEntry createEntry(String method, String url, int status, MediaType contentType, String bodyText) {
         ParsedRequest request = Tests.createRequest(method, url);
         assert contentType.charset().isPresent();
         HttpRespondable response = HttpRespondable.inMemory(status, ImmutableMultimap.of(HttpHeaders.CONTENT_TYPE, contentType.toString()), contentType, bodyText.getBytes(contentType.charset().get()));
-        return new ParsedEntry(request, request_ -> response);
+        return new HeuristicEntryMatcher.ParsedEntry(request, request_ -> response);
     }
 }

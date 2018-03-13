@@ -111,7 +111,7 @@ public class Hars {
         }
     }
 
-    static ByteSource toByteSourceFromPairs(List<NameValuePair> params, MediaType contentType) {
+    private static ByteSource toByteSourceFromPairs(List<NameValuePair> params, MediaType contentType) {
         Charset charset = contentType.charset().or(DEFAULT_WWW_FORM_DATA_CHARSET);
         String formString = URLEncodedUtils.format(params, charset);
         return CharSource.wrap(formString).asByteSource(charset);

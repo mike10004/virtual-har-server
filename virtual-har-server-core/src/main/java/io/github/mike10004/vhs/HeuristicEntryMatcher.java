@@ -2,7 +2,6 @@ package io.github.mike10004.vhs;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
-import io.github.mike10004.vhs.ParsedEntry.HttpRespondableCreator;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +11,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Objects.requireNonNull;
@@ -33,6 +31,19 @@ public class HeuristicEntryMatcher implements EntryMatcher {
 
     public static EntryMatcherFactory factory(Heuristic heuristic, int thresholdExclusive) {
         return new Factory(heuristic, thresholdExclusive);
+    }
+
+    /**
+     * Interface that maps a request to a response.
+     */
+    interface HttpRespondableCreator {
+        /**
+         * Constructs and returns a respondable.
+         * @param request the request
+         * @return the response
+         * @throws IOException on I/O error
+         */
+        HttpRespondable createRespondable(ParsedRequest request) throws IOException;
     }
 
     private static class Factory implements EntryMatcherFactory {
@@ -61,7 +72,6 @@ public class HeuristicEntryMatcher implements EntryMatcher {
             }
             return new HeuristicEntryMatcher(heuristic, thresholdExclusive, parsedEntries);
         }
-
     }
 
     @Override
@@ -89,4 +99,20 @@ public class HeuristicEntryMatcher implements EntryMatcher {
     }
 
 
+    /**
+     * Class that represents a HAR entry with a saved request and a method to produce
+     * a response.
+     */
+    static class ParsedEntry {
+
+        public final ParsedRequest request;
+
+        public final HttpRespondableCreator responseCreator;
+
+        public ParsedEntry(ParsedRequest request, HttpRespondableCreator responseCreator) {
+            this.responseCreator = requireNonNull(responseCreator);
+            this.request = requireNonNull(request);
+        }
+
+    }
 }

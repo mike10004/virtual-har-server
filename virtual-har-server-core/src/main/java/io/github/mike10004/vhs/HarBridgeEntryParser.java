@@ -23,6 +23,11 @@ import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Implementation of a HAR entry parser that gets information on HAR entries
+ * by using a HAR bridge.
+ * @param <E> the HAR entry type
+ */
 public class HarBridgeEntryParser<E> implements EntryParser<E> {
 
     private final HarBridge<E> bridge;
@@ -45,6 +50,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         }
     }
 
+    @Override
     public ParsedRequest parseRequest(E harEntry) throws IOException {
         HttpMethod method = HttpMethod.valueOf(bridge.getRequestMethod(harEntry));
         URI parsedUrl = parseUrl(method, bridge.getRequestUrl(harEntry));
