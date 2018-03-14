@@ -36,10 +36,34 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         this.bridge = requireNonNull(bridge);
     }
 
+    protected static int getDefaultPortForScheme(@Nullable String scheme, int defaultDefault) {
+        if (scheme != null) {
+            switch (scheme) {
+                case "http":
+                    return 80;
+                case "ftp":
+                    return 21;
+                case "https":
+                    return 443;
+            }
+        }
+        return defaultDefault;
+    }
+
     protected URI parseUrl(HttpMethod method, String url) {
         try {
             if (method == HttpMethod.CONNECT) {
-                HostAndPort hostAndPort = HostAndPort.fromString(url);
+                HostAndPort hostAndPort;
+                if (url.contains("/")) {
+                    URI uri = new URI(url);
+                    int port = uri.getPort();
+                    if (port <= 0) {
+                        port = getDefaultPortForScheme(uri.getScheme(), 443);
+                    }
+                    hostAndPort = HostAndPort.fromParts(uri.getHost(), port);
+                } else {
+                    hostAndPort = HostAndPort.fromString(url);
+                }
                 URI uri = new URI(null, null, hostAndPort.getHost(), hostAndPort.getPortOrDefault(-1), null, null, null);
                 return uri;
             } else {

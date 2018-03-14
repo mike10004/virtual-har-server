@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
+import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HarBridge;
@@ -17,6 +18,7 @@ import org.junit.Test;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -211,5 +213,27 @@ public class HarBridgeEntryParserTest {
             return responseStatus;
         }
         
+    }
+
+    @Test
+    public void parseUrl_normal() throws Exception {
+        String host = "example.com";
+        int port = 6789;
+        String url = HostAndPort.fromParts(host, port).toString();
+        URI actual =  new HarBridgeEntryParser<>(new FakeHarBridge()).parseUrl(HttpMethod.CONNECT, url);
+        assertEquals("parse results", parsedConnectUri(host, port), actual);
+    }
+
+    private static URI parsedConnectUri(String host, int port) throws URISyntaxException {
+        return new URI(null, null, host, port, null, null, null);
+    }
+
+    @Test
+    public void parseUrl_strangeConnectUrl() throws Exception {
+        String host = "abc.def.ghijklm.com";
+        String url = "https://" + host;
+        URI actual = new HarBridgeEntryParser<>(new FakeHarBridge()).parseUrl(HttpMethod.CONNECT, url);
+        URI expected = parsedConnectUri(host, 443);
+        assertEquals("parse result", expected, actual);
     }
 }
