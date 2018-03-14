@@ -1,6 +1,5 @@
 package io.github.mike10004.vhs.harbridge;
 
-import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 
 import java.io.ByteArrayInputStream;
@@ -9,6 +8,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * Interface of an HTTP content codec. A codec is an encoder/decoder that modifies
+ * data according to an encoding specified in the {@code Accept-Encoding} or
+ * {@code Content-Encoding} header.
+ */
 public interface HttpContentCodec {
 
     default byte[] compress(byte[] uncompressed) throws IOException {

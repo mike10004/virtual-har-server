@@ -1,8 +1,10 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.brotli.dec.BrotliInputStream;
 
 import javax.annotation.Nullable;
@@ -70,10 +72,10 @@ public class HttpContentCodecs {
     }
 
     @SuppressWarnings("RedundantThrows")
-    static class ZlibCompressor implements HttpContentCodec {
+    static class ZlibCodec implements HttpContentCodec {
         @Override
         public InputStream openDecompressingStream(InputStream source) throws IOException {
-            return new java.util.zip.DeflaterInputStream(source);
+            return new java.util.zip.InflaterInputStream(source);
         }
 
         @Override
@@ -82,14 +84,14 @@ public class HttpContentCodecs {
         }
     }
 
-    static class LzwCompressor implements HttpContentCodec {
+    static class LzwCodec implements HttpContentCodec {
         @Override
-        public byte[] compress(byte[] uncompressed) {
+        public byte[] compress(byte[] uncompressed) throws IOException {
             return new LzwCompressor().compress(uncompressed);
         }
 
         @Override
-        public byte[] decompress(byte[] compressed) {
+        public byte[] decompress(byte[] compressed) throws IOException {
             return new LzwCompressor().decompress(compressed);
         }
 
@@ -104,7 +106,7 @@ public class HttpContentCodecs {
         }
     }
 
-    static class BrotliCompressor implements HttpContentCodec {
+    static class BrotliCodec implements HttpContentCodec {
         @Override
         public OutputStream openCompressionFilter(OutputStream sink, int uncompressedLength) throws IOException {
             throw new IOException("brotli compression not supported");
@@ -118,14 +120,19 @@ public class HttpContentCodecs {
 
     @Nullable
     public static HttpContentCodec getCodec(String encoding) {
-        return compressors.get(encoding);
+        return codecs.get(encoding);
     }
 
-    private static final ImmutableMap<String, HttpContentCodec> compressors = ImmutableMap.<String, HttpContentCodec>builder()
+    private static final ImmutableMap<String, HttpContentCodec> codecs = ImmutableMap.<String, HttpContentCodec>builder()
             .put(CONTENT_ENCODING_GZIP, new GzipCompressor())
-            .put(CONTENT_ENCODING_DEFLATE, new ZlibCompressor())
-            .put(CONTENT_ENCODING_COMPRESS, new LzwCompressor())
+            .put(CONTENT_ENCODING_DEFLATE, new ZlibCodec())
+            .put(CONTENT_ENCODING_COMPRESS, new LzwCodec())
             .put(CONTENT_ENCODING_IDENTITY, HttpContentCodec.identity())
-            .put(CONTENT_ENCODING_BROTLI, new BrotliCompressor())
+            .put(CONTENT_ENCODING_BROTLI, new BrotliCodec())
             .build();
+
+    @VisibleForTesting
+    static ImmutableSet<String> getSupportedEncodings() {
+        return codecs.keySet();
+    }
 }

@@ -114,7 +114,16 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
 
     @Override
     public HarResponseData getResponseData(ParsedRequest request, HarEntry entry) throws IOException {
-        return HarResponseData.of(getResponseHeaders(entry), getResponseContentType(entry), getResponseBody(request, entry));
+        Hars.ResponseContentTranslation contentTranslation = getResponseBody(request, entry);
+        Supplier<Stream<Map.Entry<String, String>>> headers = () -> {
+            Supplier<Stream<Map.Entry<String, String>>> originalHeaders = getResponseHeaders(entry);
+            if (originalHeaders != null) {
+                return originalHeaders.get().map(contentTranslation.headerMap);
+            } else {
+                return Stream.empty();
+            }
+        };
+        return HarResponseData.of(headers, getResponseContentType(entry), contentTranslation.body);
     }
 
     @Nullable
@@ -135,10 +144,10 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         }
     }
 
-    private ByteSource getResponseBody(ParsedRequest request, HarEntry entry) throws IOException {
+    private Hars.ResponseContentTranslation getResponseBody(ParsedRequest request, HarEntry entry) throws IOException {
         HarResponse rsp = entry.getResponse();
         if (rsp == null) {
-            return ByteSource.empty();
+            return Hars.ResponseContentTranslation.withIdentityHeaderMap(ByteSource.empty());
         }
         HarContent content = requireNonNull(rsp.getContent(), "response.content");
         @Nullable Long harContentSize = nullIfNegative(content.getSize());
@@ -152,7 +161,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         @Nullable String contentType = content.getMimeType();
         @Nullable String comment = content.getComment();
         @Nullable String text = content.getText();
-        return Hars.translateResponseContent(request, contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment).body;
+        return Hars.translateResponseContent(request, contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment);
     }
 
     @Nullable

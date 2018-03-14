@@ -20,7 +20,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import static org.junit.Assert.assertEquals;
@@ -147,5 +149,18 @@ public class HarsTest {
         String responseText = result.body.asCharSource(StandardCharsets.UTF_8).read();
         assertEquals("text", text, responseText);
 
+    }
+
+    @Test
+    public void modifyContentEncodingHeaderInBrotliEncodedResponse() throws Exception {
+        ParsedRequest request = buildRequest("br");
+        String text = "hello, world";
+        ResponseContentTranslation translation = Hars.translateResponseContent(request, "text/plain", text, (long) text.length(), (long) text.length(), HttpContentCodecs.CONTENT_ENCODING_BROTLI, null, null);
+        String actual = translation.body.asCharSource(StandardCharsets.US_ASCII).read();
+        assertEquals("decoded", text, actual);
+        Map.Entry<String, String> originalHeader = new AbstractMap.SimpleImmutableEntry<>(HttpHeaders.CONTENT_ENCODING, HttpContentCodecs.CONTENT_ENCODING_BROTLI);
+        Map.Entry<String, String> modifiedHeader = translation.headerMap.apply(originalHeader);
+        assertEquals("name", originalHeader.getKey(), modifiedHeader.getKey());
+        assertEquals("value", HttpContentCodecs.CONTENT_ENCODING_IDENTITY, modifiedHeader.getValue());
     }
 }
