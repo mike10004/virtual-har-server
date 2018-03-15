@@ -13,7 +13,10 @@ import org.junit.runners.Parameterized.Parameters;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
@@ -139,6 +142,50 @@ public class BasicHeuristicTest {
             ParsedRequest incomingRequest = Tests.createRequest("GET", "http://www.example.com/foo");
             int rating = h.rate(requestInHar, incomingRequest);
             assertTrue("expected rating above default threshold", rating > BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
+        }
+    }
+
+    @RunWith(Parameterized.class)
+    public static class UrlsWithDifferentQueriesTest {
+
+        private final TestCase testCase;
+
+        public UrlsWithDifferentQueriesTest(TestCase testCase) {
+            this.testCase = testCase;
+        }
+
+        private static class TestCase {
+            public final String harUrl;
+            public final String probeUrl;
+            public final Predicate<? super Integer> ratingEvaluator;
+            public final Function<? super Integer, String> assertionMessage;
+
+            private TestCase(String harUrl, String probeUrl, Predicate<? super Integer> ratingEvaluator, Function<? super Integer, String> assertionMessage) {
+                this.harUrl = harUrl;
+                this.probeUrl = probeUrl;
+                this.ratingEvaluator = ratingEvaluator;
+                this.assertionMessage = assertionMessage;
+            }
+
+            public static TestCase aboveDefault(String harUrl, String probeUrl) {
+                return new TestCase(harUrl, probeUrl, rating -> rating > BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE, rating -> String.format("rating %s not above default", rating));
+            }
+        }
+
+        @Parameters
+        public static List<TestCase> testCases() {
+            return Arrays.asList(
+                    TestCase.aboveDefault("https://www.example.com/loopy/admin?1489615335258", "https://www.example.com/loopy/admin?1521147067350")
+            );
+        }
+
+        @Test
+        public void urlWithQueryString() throws Exception {
+            BasicHeuristic h = new BasicHeuristic();
+            ParsedRequest requestInHar = Tests.createRequest("GET", testCase.harUrl);
+            ParsedRequest incomingRequest = Tests.createRequest("GET", testCase.probeUrl);
+            int rating = h.rate(requestInHar, incomingRequest);
+            assertTrue(testCase.assertionMessage.apply(rating), testCase.ratingEvaluator.test(rating));
         }
     }
 
