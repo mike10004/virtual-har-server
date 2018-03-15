@@ -121,6 +121,27 @@ public class BasicHeuristicTest {
         }
     }
 
+    public static class TolerateDifferentSchemeTest {
+
+        @Test
+        public void tolerateHttpsInsteadOfHttp() throws Exception {
+            BasicHeuristic h = new BasicHeuristic();
+            ParsedRequest requestInHar = Tests.createRequest("GET", "http://www.example.com/foo");
+            ParsedRequest incomingRequest = Tests.createRequest("GET", "https://www.example.com/foo");
+            int rating = h.rate(requestInHar, incomingRequest);
+            assertTrue("expected rating above default threshold", rating > BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
+        }
+
+        @Test
+        public void tolerateHttpInsteadOfHttps() throws Exception {
+            BasicHeuristic h = new BasicHeuristic();
+            ParsedRequest requestInHar = Tests.createRequest("GET", "https://www.example.com/foo");
+            ParsedRequest incomingRequest = Tests.createRequest("GET", "http://www.example.com/foo");
+            int rating = h.rate(requestInHar, incomingRequest);
+            assertTrue("expected rating above default threshold", rating > BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
+        }
+    }
+
     public static class BodyComparisonTest {
 
         @Test
