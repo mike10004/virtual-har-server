@@ -52,10 +52,18 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
             return null;
         }
         if (ProxyUtils.isCONNECT(originalRequest)) {
-            return new HostRewriteFilter(originalRequest, ctx, hostRewriter);
+            return createHostRewriteFilter(originalRequest, ctx, hostRewriter);
         } else {
-            return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
+            return createResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
         }
+    }
+
+    /* package */ HostRewriteFilter createHostRewriteFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, HostRewriter hostRewriter) {
+        return new HostRewriteFilter(originalRequest, ctx, hostRewriter);
+    }
+
+    /* package */ ResponseManufacturingFilter createResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseFilter proxyToClientResponseFilter) {
+        return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
     }
 
     @VisibleForTesting

@@ -4,12 +4,24 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.common.net.HostAndPort;
+import org.apache.http.HttpHost;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContexts;
+import org.apache.http.ssl.TrustStrategy;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 
 public class Tests {
 
@@ -42,5 +54,50 @@ public class Tests {
             System.err.format("test of socket liveness failed: %s%n", e.toString());
             return false;
         }
+    }
+
+    public static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
+        SSLContext sslContext = SSLContexts
+                .custom()
+                .loadTrustMaterial(blindTrustStrategy())
+                .build();
+        clientBuilder.setSSLContext(sslContext);
+        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, blindHostnameVerifier());
+        clientBuilder.setSSLSocketFactory(sslsf);
+        clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
+    }
+
+    public static javax.net.ssl.HostnameVerifier blindHostnameVerifier() {
+        return new BlindHostnameVerifier();
+    }
+
+    public static TrustStrategy blindTrustStrategy() {
+        return new BlindTrustStrategy();
+    }
+
+    private static final class BlindHostnameVerifier implements javax.net.ssl.HostnameVerifier {
+        @Override
+        public boolean verify(String s, SSLSession sslSession) {
+            return true;
+        }
+    }
+
+    private static final class BlindTrustStrategy implements TrustStrategy {
+        @Override
+        public boolean isTrusted(java.security.cert.X509Certificate[] chain, String authType)  {
+            return true;
+        }
+
+    }
+
+    public static CloseableHttpClient buildBlindlyTrustingHttpClient(HostAndPort proxy) throws GeneralSecurityException {
+        HttpClientBuilder b = HttpClients.custom()
+                .useSystemProperties();
+        if (proxy != null) {
+            b.setProxy(new HttpHost(proxy.getHost(), proxy.getPort()));
+        }
+        b.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false));
+        configureClientToTrustBlindly(b);
+        return b.build();
     }
 }

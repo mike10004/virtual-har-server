@@ -13,22 +13,16 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContexts;
-import org.apache.http.ssl.TrustStrategy;
 import org.apache.http.util.EntityUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import javax.annotation.Nullable;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -209,7 +203,7 @@ public abstract class VirtualHarServerTestBase {
         }
     }
 
-    protected static class BlindlyTrustingClient extends ApacheRecordingClient {
+    public static class BlindlyTrustingClient extends ApacheRecordingClient {
 
         public BlindlyTrustingClient() {
             super(false);
@@ -223,41 +217,12 @@ public abstract class VirtualHarServerTestBase {
         protected void configureHttpClientBuilder(HttpClientBuilder b, HostAndPort proxy) throws Exception {
             super.configureHttpClientBuilder(b, proxy);
             try {
-                configureClientToTrustBlindly(b);
+                Tests.configureClientToTrustBlindly(b);
             } catch (GeneralSecurityException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        private static void configureClientToTrustBlindly(HttpClientBuilder clientBuilder) throws GeneralSecurityException {
-            SSLContext sslContext = SSLContexts
-                    .custom()
-                    .loadTrustMaterial(new BlindTrustStrategy())
-                    .build();
-            clientBuilder.setSSLContext(sslContext);
-            SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, blindHostnameVerifier());
-            clientBuilder.setSSLSocketFactory(sslsf);
-            clientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
-        }
-
     }
 
-    protected static javax.net.ssl.HostnameVerifier blindHostnameVerifier() {
-        return new BlindHostnameVerifier();
-    }
-
-    private static final class BlindHostnameVerifier implements javax.net.ssl.HostnameVerifier {
-        @Override
-        public boolean verify(String s, SSLSession sslSession) {
-            return true;
-        }
-    }
-
-    private static final class BlindTrustStrategy implements TrustStrategy {
-        @Override
-        public boolean isTrusted(java.security.cert.X509Certificate[] chain, String authType)  {
-            return true;
-        }
-
-    }
 }

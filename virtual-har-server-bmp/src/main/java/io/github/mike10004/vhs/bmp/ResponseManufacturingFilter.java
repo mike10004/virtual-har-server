@@ -1,6 +1,7 @@
 package io.github.mike10004.vhs.bmp;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URIBuilder;
 import io.netty.channel.ChannelHandlerContext;
@@ -9,15 +10,8 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.codec.http.QueryStringDecoder;
-import net.lightbody.bmp.core.har.HarNameValuePair;
-import net.lightbody.bmp.core.har.HarPostData;
-import net.lightbody.bmp.core.har.HarPostDataParam;
-import net.lightbody.bmp.core.har.HarRequest;
-import net.lightbody.bmp.exception.UnsupportedCharsetException;
 import net.lightbody.bmp.filters.ClientRequestCaptureFilter;
 import net.lightbody.bmp.filters.HttpsAwareFiltersAdapter;
-import net.lightbody.bmp.util.BrowserMobHttpUtil;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +20,6 @@ import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -49,7 +40,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     private transient final Object responseLock = new Object();
     private final transient AtomicBoolean unreachableExceptionThrown = new AtomicBoolean(false);
     private volatile boolean responseSent;
-    private final HarRequest harRequest = new HarRequest();
+    private final RequestAccumulator requestAccumulator;
     private final BmpResponseFilter proxyToClientResponseFilter;
 
     /**
@@ -62,11 +53,6 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     private final BmpResponseManufacturer responseManufacturer;
 
     /**
-     * The "real" original request, as captured by the {@link #clientToProxyRequest(io.netty.handler.codec.http.HttpObject)} method.
-     */
-    private volatile HttpRequest capturedOriginalRequest;
-
-    /**
      * Create a new instance.
      * @param originalRequest the original HttpRequest from the HttpFiltersSource factory
      * @param ctx channel handler context
@@ -77,6 +63,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         if (ProxyUtils.isCONNECT(originalRequest)) {
             throw new IllegalArgumentException("HTTP CONNECT requests not supported by these filters");
         }
+        requestAccumulator = new RequestAccumulator(originalRequest.getProtocolVersion());
         requestCaptureFilter = new ClientRequestCaptureFilter(originalRequest);
         this.responseManufacturer = requireNonNull(responseManufacturer);
         this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
@@ -87,28 +74,30 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         return interceptRequest(httpObject);
     }
 
-    protected HttpResponse interceptRequest(HttpObject httpObject) {
+    protected void captureRequest(HttpObject httpObject) {
         requestCaptureFilter.clientToProxyRequest(httpObject);
         if (httpObject instanceof HttpRequest) {
             HttpRequest httpRequest = (HttpRequest) httpObject;
-            this.capturedOriginalRequest = httpRequest;
             // associate this request's HarRequest object with the har entry
-            populateHarRequestFromHttpRequest(httpRequest, harRequest);
-            captureQueryParameters(httpRequest, harRequest);
-            captureRequestHeaders(httpRequest, harRequest);
+            captureMethodAndUrl(httpRequest);
+            captureRequestHeaders(httpRequest);
         }
 
         if (httpObject instanceof LastHttpContent) {
             LastHttpContent lastHttpContent = (LastHttpContent) httpObject;
-            captureTrailingHeaders(lastHttpContent, harRequest);
-            captureRequestContent(requestCaptureFilter.getHttpRequest(), requestCaptureFilter.getFullRequestContents(), harRequest);
+            captureTrailingHeaders(lastHttpContent);
+            captureRequestContent(requestCaptureFilter.getFullRequestContents());
         }
+    }
+
+    protected HttpResponse interceptRequest(HttpObject httpObject) {
+        captureRequest(httpObject);
         synchronized (responseLock) {
             checkState(!responseSent, "response already sent");
             log.debug("producing response for {}", describe(httpObject));
             responseSent = true;
         }
-        HttpResponse response = produceResponse(capturedOriginalRequest, harRequest);
+        HttpResponse response = produceResponse(freezeRequestCapture());
         return response;
     }
 
@@ -124,8 +113,13 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         return null;
     }
 
-    protected HttpResponse produceResponse(HttpRequest httpRequest, HarRequest harRequest) {
-        return responseManufacturer.manufacture(httpRequest, harRequest);
+    @VisibleForTesting
+    RequestCapture freezeRequestCapture() {
+        return requestAccumulator.freeze();
+    }
+
+    protected HttpResponse produceResponse(RequestCapture bmpRequest) {
+        return responseManufacturer.manufacture(bmpRequest);
     }
 
     @Override
@@ -140,141 +134,71 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
      * Populates a HarRequest object using the method, url, and HTTP version of the specified request.
      * @param httpRequest HTTP request on which the HarRequest will be based
      */
-    private void populateHarRequestFromHttpRequest(HttpRequest httpRequest, HarRequest harRequest) {
-        harRequest.setMethod(httpRequest.getMethod().toString());
-        String fullUrl = getFullUrl(httpRequest);
-        String originalUrl = getOriginalUrl();
-        log.debug("choose: {} or {}", fullUrl, originalUrl);
-        harRequest.setUrl(reconstructUrlFromFullUrlAndHostHeader(httpRequest));
-        harRequest.setHttpVersion(httpRequest.getProtocolVersion().text());
+    private void captureMethodAndUrl(HttpRequest httpRequest) {
+        requestAccumulator.setMethod(httpRequest.getMethod().toString());
+        requestAccumulator.setUrl(reconstructUrlFromRequest(httpRequest));
+    }
+
+    static boolean isDefaultPortForScheme(@Nullable String scheme, int port) {
+        @Nullable Integer defaultPort = PortsAndSchemes.getDefaultPort(scheme);
+        return defaultPort != null && port == defaultPort.intValue();
+    }
+
+    private static void cleanHostAndPort(URIBuilder uriBuilder, String hostHeaderValue, @Nullable String scheme) {
+        HostAndPort hap = HostAndPort.fromString(hostHeaderValue);
+        uriBuilder.setHost(hap.getHost());
+        uriBuilder.setPort(-1);
+        if (hap.hasPort() && !isDefaultPortForScheme(scheme, hap.getPort())) {
+            uriBuilder.setPort(hap.getPort());
+        }
+    }
+
+    protected String reconstructUrlFromRequest(HttpRequest request) {
         // the HAR spec defines the request.url field as:
         //     url [string] - Absolute URL of the request (fragments are not included).
         // the URI on the httpRequest may only identify the path of the resource, so find the full URL.
         // the full URL consists of the scheme + host + port (if non-standard) + path + query params + fragment.
-    }
-
-    private static String removePort(String hostHeaderValue) {
-        HostAndPort hap = HostAndPort.fromString(hostHeaderValue);
-        return hap.getHost();
-    }
-
-    protected String reconstructUrlFromFullUrlAndHostHeader(HttpRequest request) {
         String fullUrl = getFullUrl(request);
+        @Nullable String hostHeader = request.headers().get(com.google.common.net.HttpHeaders.HOST);
+        return reconstructUrlFromFullUrlAndHostHeader(fullUrl, hostHeader);
+    }
+
+    protected String reconstructUrlFromFullUrlAndHostHeader(String fullUrl, @Nullable String hostHeader) {
         if (isHttps()) {
-            String hostHeader = request.headers().get(com.google.common.net.HttpHeaders.HOST);
             if (hostHeader != null) {
                 try {
-                    URI uri = new URIBuilder(fullUrl)
-                            .setHost(removePort(hostHeader))
-                            .build();
-                    fullUrl = uri.toString();
+                    URI fullUrlUri = new URI(fullUrl);
+                    URIBuilder uriBuilder = new URIBuilder(fullUrlUri);
+                    cleanHostAndPort(uriBuilder, hostHeader, fullUrlUri.getScheme());
+                    fullUrl = uriBuilder.build().toString();
                 } catch (URISyntaxException e) {
                     log.info("failed to reconstruct URL with proper host", e);
                 }
             } else {
-                log.info("no host header in request {} {}", request.getMethod(), fullUrl);
+                log.info("no host header in request {} {}", requestAccumulator.getMethod(), fullUrl);
             }
         }
         return fullUrl;
     }
 
-    @Override
-    public String getFullUrl(HttpRequest modifiedRequest) {
-        return super.getFullUrl(modifiedRequest);
-    }
-
-    @Override
-    public String getOriginalUrl() {
-        return super.getOriginalUrl();
-    }
-
-    protected void captureQueryParameters(HttpRequest httpRequest, HarRequest harRequest) {
-        // capture query parameters. it is safe to assume the query string is UTF-8, since it "should" be in US-ASCII (a subset of UTF-8),
-        // but sometimes does include UTF-8 characters.
-        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(httpRequest.getUri(), StandardCharsets.UTF_8);
-
-        try {
-            for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
-                for (String value : entry.getValue()) {
-                    harRequest.getQueryString().add(new HarNameValuePair(entry.getKey(), value));
-                }
-            }
-        } catch (IllegalArgumentException e) {
-            // QueryStringDecoder will throw an IllegalArgumentException if it cannot interpret a query string. rather than cause the entire request to
-            // fail by propagating the exception, simply skip the query parameter capture.
-            log.info("Unable to decode query parameters on URI: " + httpRequest.getUri(), e);
-        }
-    }
-
-    protected void captureRequestHeaders(HttpRequest httpRequest, HarRequest harRequest) {
+    protected void captureRequestHeaders(HttpRequest httpRequest) {
         HttpHeaders headers = httpRequest.headers();
-        captureHeaders(headers, harRequest);
+        captureHeaders(headers);
     }
 
-    protected void captureTrailingHeaders(LastHttpContent lastHttpContent, HarRequest harRequest) {
+    protected void captureTrailingHeaders(LastHttpContent lastHttpContent) {
         HttpHeaders headers = lastHttpContent.trailingHeaders();
-        captureHeaders(headers, harRequest);
+        captureHeaders(headers);
     }
 
-    protected void captureHeaders(HttpHeaders headers, HarRequest harRequest) {
+    protected void captureHeaders(HttpHeaders headers) {
         for (Map.Entry<String, String> header : headers.entries()) {
-            harRequest.getHeaders().add(new HarNameValuePair(header.getKey(), header.getValue()));
+            requestAccumulator.addHeader(header.getKey(), header.getValue());
         }
     }
 
-    protected void captureRequestContent(HttpRequest httpRequest, byte[] fullMessage, HarRequest harRequest) {
-        if (fullMessage.length == 0) {
-            return;
-        }
-
-        String contentType = HttpHeaders.getHeader(httpRequest, HttpHeaders.Names.CONTENT_TYPE);
-        if (contentType == null) {
-            log.warn("No content type specified in request to {}. Content will be treated as {}", httpRequest.getUri(), BrowserMobHttpUtil.UNKNOWN_CONTENT_TYPE);
-            contentType = BrowserMobHttpUtil.UNKNOWN_CONTENT_TYPE;
-        }
-
-        HarPostData postData = new HarPostData();
-        harRequest.setPostData(postData);
-
-        postData.setMimeType(contentType);
-
-        final boolean urlEncoded = contentType.startsWith(HttpHeaders.Values.APPLICATION_X_WWW_FORM_URLENCODED);
-
-        Charset charset;
-        try {
-            charset = BrowserMobHttpUtil.readCharsetInContentTypeHeader(contentType);
-        } catch (UnsupportedCharsetException e) {
-            log.warn("Found unsupported character set in Content-Type header '{}' in HTTP request to {}. Content will not be captured in HAR.", contentType, httpRequest.getUri(), e);
-            return;
-        }
-
-        if (charset == null) {
-            // no charset specified, so use the default -- but log a message since this might not encode the data correctly
-            charset = BrowserMobHttpUtil.DEFAULT_HTTP_CHARSET;
-            log.debug("No charset specified; using charset {} to decode contents to {}", charset, httpRequest.getUri());
-        }
-
-        if (urlEncoded) {
-            String textContents = BrowserMobHttpUtil.getContentAsString(fullMessage, charset);
-
-            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(textContents, charset, false);
-
-            ImmutableList.Builder<HarPostDataParam> paramBuilder = ImmutableList.builder();
-
-            for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
-                for (String value : entry.getValue()) {
-                    paramBuilder.add(new HarPostDataParam(entry.getKey(), value));
-                }
-            }
-
-            harRequest.getPostData().setParams(paramBuilder.build());
-        } else {
-            //TODO: implement capture of files and multipart form data
-
-            // not URL encoded, so let's grab the body of the POST and capture that
-            String postBody = BrowserMobHttpUtil.getContentAsString(fullMessage, charset);
-            harRequest.getPostData().setText(postBody);
-        }
+    protected void captureRequestContent(byte[] fullMessage) {
+        requestAccumulator.setBody(fullMessage);
     }
 
     /**
@@ -285,9 +209,9 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     static class UnreachableCallbackException extends IllegalStateException {}
 
     private void raiseUnreachable() {
-        HttpRequest captured = capturedOriginalRequest;
+        HttpRequest captured = originalRequest;
         if (captured != null) {
-            log.error("should be unreachable: {} {}", captured.getMethod(), captured.getUri());
+            log.error("should be unreachable: (original) {} {}", captured.getMethod(), captured.getUri());
         } else {
             log.error("should be unreachable; no request captured");
         }
@@ -299,7 +223,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     @Override
     public HttpObject serverToProxyResponse(HttpObject httpObject) {
         raiseUnreachable();
-        return httpObject;
+        return super.serverToProxyResponse(httpObject);
     }
 
     @Override
@@ -331,7 +255,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     @Override
     public HttpResponse proxyToServerRequest(HttpObject httpObject) {
         raiseUnreachable();
-        return null;
+        return super.proxyToServerRequest(httpObject);
     }
 
     @Override
@@ -375,4 +299,61 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         raiseUnreachable();
     }
 
+    private static class PortsAndSchemes {
+
+        @Nullable
+        public static Integer getDefaultPort(@Nullable String scheme) {
+            if (scheme == null) {
+                return null;
+            }
+            return defaultPortByScheme.get(scheme);
+        }
+
+        // https://gist.github.com/mahmoud/2fe281a8daaff26cfe9c15d2c5bf5c8b
+        private static final ImmutableMap<String, Integer> defaultPortByScheme = ImmutableMap.<String, Integer>builder()
+                .put("acap", 674)
+                .put("afp", 548)
+                .put("dict", 2628)
+                .put("dns", 53)
+                .put("ftp", 21)
+                .put("git", 9418)
+                .put("gopher", 70)
+                .put("http", 80)
+                .put("https", 443)
+                .put("imap", 143)
+                .put("ipp", 631)
+                .put("ipps", 631)
+                .put("irc", 194)
+                .put("ircs", 6697)
+                .put("ldap", 389)
+                .put("ldaps", 636)
+                .put("mms", 1755)
+                .put("msrp", 2855)
+                .put("mtqp", 1038)
+                .put("nfs", 111)
+                .put("nntp", 119)
+                .put("nntps", 563)
+                .put("pop", 110)
+                .put("prospero", 1525)
+                .put("redis", 6379)
+                .put("rsync", 873)
+                .put("rtsp", 554)
+                .put("rtsps", 322)
+                .put("rtspu", 5005)
+                .put("sftp", 22)
+                .put("smb", 445)
+                .put("snmp", 161)
+                .put("ssh", 22)
+                .put("svn", 3690)
+                .put("telnet", 23)
+                .put("ventrilo", 3784)
+                .put("vnc", 5900)
+                .put("wais", 210)
+                .put("ws", 80)
+                .put("wss", 443)
+                .build();
+
+        private PortsAndSchemes() {
+        }
+    }
 }

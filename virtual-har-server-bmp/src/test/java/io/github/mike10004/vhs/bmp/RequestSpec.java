@@ -21,11 +21,12 @@ public class RequestSpec {
     }
 
     public static RequestSpec get(URI url) {
-        return new RequestSpec(HttpMethod.GET, url, null, null);
+        return new RequestSpec(HttpMethodStrings.GET, url, null, null);
     }
 
     @SuppressWarnings("unused")
-    public static final class HttpMethod {
+    public static final class HttpMethodStrings {
+        private HttpMethodStrings() {}
         public static final String GET = "GET";
         public static final String POST = "POST";
         public static final String PUT = "PUT";

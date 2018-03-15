@@ -7,9 +7,7 @@ import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.HttpRespondable;
 import io.github.mike10004.vhs.ResponseInterceptor;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import net.lightbody.bmp.core.har.HarRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +29,7 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
 
     private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
-    private final HttpAssistant<BmpRequest, HttpResponse> bmpAssistant;
+    private final HttpAssistant<RequestCapture, HttpResponse> bmpAssistant;
     private final BmpResponseListener responseListener;
 
     /**
@@ -44,7 +42,7 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
         this(entryMatcher, responseInterceptors, responseListener, new BmpHttpAssistant());
     }
 
-    protected HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener, HttpAssistant<BmpRequest, HttpResponse> bmpAssistant) {
+    protected HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener, HttpAssistant<RequestCapture, HttpResponse> bmpAssistant) {
         this.entryMatcher = requireNonNull(entryMatcher);
         this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
         this.bmpAssistant = requireNonNull(bmpAssistant);
@@ -52,9 +50,8 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
     }
 
     @Override
-    public HttpResponse manufacture(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
-        BmpRequest bmpRequest = BmpRequest.of(originalRequest, fullCapturedRequest);
-        return manufacture(bmpAssistant, bmpRequest);
+    public HttpResponse manufacture(RequestCapture capture) {
+        return manufacture(bmpAssistant, capture);
     }
 
     protected ImmutableHttpResponse createNotFoundResponse() {

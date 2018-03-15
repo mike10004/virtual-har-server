@@ -28,7 +28,7 @@ import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import net.lightbody.bmp.core.har.HarRequest;
+
 import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -92,9 +92,9 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
         HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList(), newLoggingResponseListener()) {
             @Override
-            public HttpResponse manufacture(HttpRequest originalRequest, HarRequest fullCapturedRequest) {
-                requests.add(String.format("%s %s", fullCapturedRequest.getMethod(), fullCapturedRequest.getUrl()));
-                return super.manufacture(originalRequest, fullCapturedRequest);
+            public HttpResponse manufacture(RequestCapture capture) {
+                requests.add(String.format("%s %s", capture.request.method, capture.request.url));
+                return super.manufacture(capture);
             }
         };
         Path scratchParent = temporaryFolder.getRoot().toPath();
@@ -185,7 +185,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
                     .loadTrustMaterial(keyStore, null)
                     .build();
             b.setSSLContext(customSslContext);
-            b.setSSLHostnameVerifier(blindHostnameVerifier());
+            b.setSSLHostnameVerifier(Tests.blindHostnameVerifier());
         }
     }
 

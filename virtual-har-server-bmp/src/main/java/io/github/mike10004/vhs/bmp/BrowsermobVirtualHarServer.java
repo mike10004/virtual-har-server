@@ -114,7 +114,11 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
         MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource, trustSource);
         bmp.setMitmManager(mitmManager);
         HostRewriter hostRewriter = HostRewriter.from(httpsHostRewriteDestination);
-        bmp.addFirstHttpFilterFactory(new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, createPassthruPredicate()));
+        bmp.addFirstHttpFilterFactory(createFirstFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, createPassthruPredicate()));
+    }
+
+    /* package */ ResponseManufacturingFiltersSource createFirstFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseFilter proxyToClientResponseFilter, PassthruPredicate passthruPredicate) {
+        return new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, passthruPredicate);
     }
 
     class BrowsermobVhsControl implements VirtualHarServerControl {
