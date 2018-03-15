@@ -1,5 +1,8 @@
 package io.github.mike10004.vhs;
 
+import com.google.common.base.MoreObjects;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
@@ -8,7 +11,6 @@ import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
-import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
 
 import javax.annotation.Nullable;
@@ -17,10 +19,13 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Implementation of a heuristic that compares request headers, parameters, and bodies.
@@ -42,38 +47,28 @@ public class BasicHeuristic implements Heuristic {
 
     public BasicHeuristic(int increment) {
         this.increment = increment;
+        checkArgument(increment % 2 == 0, "increment must be even: %s", increment);
         this.halfIncrement = this.increment / 2;
     }
 
-    @Override
-    public int rate(ParsedRequest entryRequest, ParsedRequest request) {
-        // String name;
-        URI requestUrl = request.url;
-        Multimap<String, String> requestHeaders = request.indexedHeaders;
-        @Nullable Multimap<String, Optional<String>> requestQuery = request.query;
-        // method, host and pathname must match
-        if (requestUrl == null) {
-            return 0;
-        }
-        if (!entryRequest.method.equals(request.method)) { // TODO replace with enum != enum
-            return 0;
-        }
-        if (!entryRequest.url.getHost().equals(requestUrl.getHost())) {
-            return 0;
-        }
-        if (!entryRequest.url.getPath().equals(requestUrl.getPath())) {
-            return 0;
-        }
-        int points = increment; // One point for matching above requirements
-
-        // each query
-        @Nullable Multimap<String, Optional<String>> entryQuery = entryRequest.query;
-        if (entryQuery != null && requestQuery != null) {
+    protected int rateQuerySameness(@Nullable Multimap<String, Optional<String>> entryQuery, @Nullable Multimap<String, Optional<String>> requestQuery) {
+        int points = 0;
+        if (entryQuery == null && requestQuery == null) {
+            points += increment;
+        } else {
+            //noinspection ConstantConditions
+            entryQuery = MoreObjects.firstNonNull(entryQuery, ImmutableMultimap.of());
+            //noinspection ConstantConditions
+            requestQuery = MoreObjects.firstNonNull(requestQuery, ImmutableMultimap.of());
             for (String name : requestQuery.keySet()) {
                 if (!entryQuery.containsKey(name)) {
                     points -= halfIncrement;
                 } else {
-                    points += stripProtocolFromOptionals(entryQuery.get(name)).equals(stripProtocolFromOptionals(requestQuery.get(name))) ? increment : 0;
+                    Multiset<Optional<String>> entryParamValues = stripProtocolFromOptionals(entryQuery.get(name));
+                    Multiset<Optional<String>> requestParamValues = stripProtocolFromOptionals(requestQuery.get(name));
+                    if (entryParamValues.equals(requestParamValues)) {
+                        points += increment;
+                    }
                 }
             }
 
@@ -83,6 +78,29 @@ public class BasicHeuristic implements Heuristic {
                 }
             }
         }
+        return Math.max(0, points);
+    }
+
+    @Override
+    public int rate(ParsedRequest entryRequest, ParsedRequest request) {
+        // String name;
+        URI requestUrl = request.url;
+        Multimap<String, String> requestHeaders = request.indexedHeaders;
+        // method, host and pathname must match
+        if (requestUrl == null) {
+            return 0;
+        }
+        if (entryRequest.method != request.method) {
+            return 0;
+        }
+        if (!entryRequest.url.getHost().equals(requestUrl.getHost())) {
+            return 0;
+        }
+        if (!entryRequest.url.getPath().equals(requestUrl.getPath())) {
+            return 0;
+        }
+        int points = increment; // One point for matching above requirements
+        points += rateQuerySameness(entryRequest.query, request.query);
 
         // each header
         Multimap<String, String> entryHeaders = entryRequest.indexedHeaders;
@@ -97,25 +115,23 @@ public class BasicHeuristic implements Heuristic {
             if (!request.isBodyPresent() && !entryRequest.isBodyPresent()) {
                 points += halfIncrement;
             } else if (request.isBodyPresent() && entryRequest.isBodyPresent()) {
-                if (isSameBody(entryRequest, request)) {
-                    points += increment;
-                }
+                points += rateBodySameness(entryRequest, request);
             }
         }
 
         return points;
     }
 
-    static boolean isSameBody(ParsedRequest entryRequest, ParsedRequest request) {
+    protected int rateBodySameness(ParsedRequest entryRequest, ParsedRequest request) {
         ByteSource requestBody = bodyToByteSource(request);
         ByteSource entryBody = bodyToByteSource(entryRequest);
         @Nullable String entryContentType = entryRequest.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
         @Nullable String requestContentType = request.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
-        return isSameBody(entryBody, entryContentType, requestBody, requestContentType);
+        return rateBodySameness(entryBody, entryContentType, requestBody, requestContentType);
     }
 
     @Nullable
-    private static Multiset<NameValuePair> parseIfWwwFormData(ByteSource body, @Nullable String contentType) {
+    private static Multimap<String, Optional<String>> parseIfWwwFormData(ByteSource body, @Nullable String contentType) {
         if (contentType != null) {
             try {
                 MediaType mediaType = MediaType.parse(contentType);
@@ -123,11 +139,15 @@ public class BasicHeuristic implements Heuristic {
                     Charset charset = mediaType.charset().or(DEFAULT_FORM_DATA_CHARSET);
                     String queryString = body.asCharSource(charset).read();
                     List<Map.Entry<String, String>> params = URLEncodedUtils.parse(queryString, charset);
-                    if (params == null) {
-                        return ImmutableMultiset.of();
+                    if (params != null) {
+                        Multimap<String, Optional<String>> mm = ArrayListMultimap.create();
+                        params.stream()
+                                .map(p -> new AbstractMap.SimpleImmutableEntry<>(p.getKey(), Optional.ofNullable(p.getValue())))
+                                .forEach(p -> mm.put(p.getKey(), p.getValue()));
+                        return mm;
+                    } else {
+                        return ImmutableMultimap.of();
                     }
-                    return params.stream().map(NameValuePair::from)
-                            .collect(ImmutableMultiset.toImmutableMultiset());
                 }
             } catch (RuntimeException | IOException ignore) {
             }
@@ -135,26 +155,24 @@ public class BasicHeuristic implements Heuristic {
         return null;
     }
 
-    static boolean isSameBody(ByteSource entryBody, @Nullable String entryContentType, ByteSource requestBody, @Nullable String requestContentType) {
+    int rateBodySameness(ByteSource entryBody, @Nullable String entryContentType, ByteSource requestBody, @Nullable String requestContentType) {
         if (entryBody.sizeIfKnown().equals(requestBody.sizeIfKnown())) {
             if (entryBody.sizeIfKnown().isPresent() && entryBody.sizeIfKnown().get().equals(0L)) {
-                return true;
+                return increment;
             }
         }
-        @Nullable Multiset<NameValuePair> entryParams = parseIfWwwFormData(entryBody, entryContentType);
-        if (entryParams != null) {
-            @Nullable Multiset<NameValuePair> requestParams = parseIfWwwFormData(requestBody, requestContentType);
+        @Nullable Multimap<String, Optional<String>> entryParams = parseIfWwwFormData(entryBody, entryContentType);
+        if (entryParams != null) { // then it's form data
+            @Nullable Multimap<String, Optional<String>> requestParams = parseIfWwwFormData(requestBody, requestContentType);
             if (requestParams != null) {
-                return entryParams.equals(requestParams);
+                return rateQuerySameness(entryParams, requestParams);
             }
         }
         try {
-            if (requestBody.contentEquals(entryBody)) {
-                return true;
-            }
-        } catch (IOException ignore) {
+            return entryBody.contentEquals(requestBody) ? increment : 0;
+        } catch (IOException e) {
+            return 0;
         }
-        return false;
     }
 
     private static ByteSource bodyToByteSource(ParsedRequest request) {

@@ -28,6 +28,15 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Enclosed.class)
 public class BasicHeuristicTest {
 
+    public static class SmokeTest {
+        @Test
+        public void comparingEnums() {
+            ParsedRequest req = Tests.createRequest("GET", "http://example.com/");
+            //noinspection ConstantConditions
+            assertTrue(req.method instanceof Enum);
+        }
+    }
+
     private interface ParameterSource<T> {
         @SuppressWarnings("unused")
         List<T> produce() throws Exception ;
@@ -174,9 +183,12 @@ public class BasicHeuristicTest {
 
         @Parameters
         public static List<TestCase> testCases() {
-            return Arrays.asList(
-                    TestCase.aboveDefault("https://www.example.com/loopy/admin?1489615335258", "https://www.example.com/loopy/admin?1521147067350")
-            );
+            //noinspection RedundantArrayCreation
+            return Arrays.asList(new TestCase[]{
+                    TestCase.aboveDefault("https://www.example.com/loopy/admin?1489615335258", "https://www.example.com/loopy/admin?1521147067350"),
+//                    TestCase.aboveDefault("https://www.example.com/loopy/admin?foo=bar", "https://www.example.com/loopy/admin?foo=bar"),
+//                    TestCase.aboveDefault("https://www.example.com/loopy/admin?foo=bar", "https://www.example.com/loopy/admin?foo=baz"),
+            });
         }
 
         @Test
@@ -191,12 +203,17 @@ public class BasicHeuristicTest {
 
     public static class BodyComparisonTest {
 
+        private boolean isAboveDefault(ByteSource body1, String contentType1, ByteSource body2, String contentType2) {
+            int rating = new BasicHeuristic().rateBodySameness(body1, contentType1, body2, contentType2);
+            return rating > BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE;
+        }
+
         @Test
         public void isSameBody_formDatas_sameOrder() throws Exception {
             ByteSource body1 = CharSource.wrap("foo=bar&baz=gaw").asByteSource(UTF_8);
             ByteSource body2 = CharSource.wrap("foo=bar&baz=gaw").asByteSource(UTF_8);
             String contentType = MediaType.FORM_DATA.withCharset(UTF_8).toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType, body2, contentType);
+            boolean same = isAboveDefault(body1, contentType, body2, contentType);
             assertTrue("same body when parameters are in same order", same);
         }
 
@@ -205,7 +222,7 @@ public class BasicHeuristicTest {
             ByteSource body1 = CharSource.wrap("foo=bar&baz=gaw").asByteSource(UTF_8);
             ByteSource body2 = CharSource.wrap("baz=gaw&foo=bar").asByteSource(UTF_8);
             String contentType = MediaType.FORM_DATA.withCharset(UTF_8).toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType, body2, contentType);
+            boolean same = isAboveDefault(body1, contentType, body2, contentType);
             assertTrue("same body when parameters are reordered", same);
         }
 
@@ -214,7 +231,7 @@ public class BasicHeuristicTest {
             ByteSource body1 = CharSource.wrap("foo=bar&baz=gaw").asByteSource(UTF_8);
             ByteSource body2 = CharSource.wrap("three=little&pigs=wolf").asByteSource(UTF_8);
             String contentType = MediaType.FORM_DATA.withCharset(UTF_8).toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType, body2, contentType);
+            boolean same = isAboveDefault(body1, contentType, body2, contentType);
             assertFalse("not same body", same);
         }
 
@@ -223,11 +240,20 @@ public class BasicHeuristicTest {
             ByteSource body1 = CharSource.wrap("foo=bar&baz=gaw").asByteSource(UTF_8);
             ByteSource body2 = CharSource.wrap("foo=bar&foo=bar&baz=gaw").asByteSource(UTF_8);
             String contentType = MediaType.FORM_DATA.withCharset(UTF_8).toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType, body2, contentType);
-            assertFalse("not same body", same);
+            boolean same = isAboveDefault(body1, contentType, body2, contentType);
+            assertTrue("pretty much the same body", same);
         }
 
-        private static final String CHARSET_IGNORE_REASON = "form data is expected to be all ascii, it seems, even though that makes more sense for URLs than it does for message bodies";
+        @Test
+        public void isSameBody_formData_veryNotEqual() throws Exception {
+            ByteSource body1 = CharSource.wrap("foo=bar&baz=gaw").asByteSource(UTF_8);
+            ByteSource body2 = CharSource.wrap("q=1&u=2").asByteSource(UTF_8);
+            String contentType = MediaType.FORM_DATA.withCharset(UTF_8).toString();
+            boolean same = isAboveDefault(body1, contentType, body2, contentType);
+            assertFalse("not at all the same body", same);
+        }
+
+        private static final String CHARSET_IGNORE_REASON = "ignoring because form data is expected to be all ascii, it seems, even though in theory the request could specify a content-type for the body with a different charset";
 
         @org.junit.Ignore(CHARSET_IGNORE_REASON)
         @Test
@@ -236,7 +262,7 @@ public class BasicHeuristicTest {
             ByteSource body2 = CharSource.wrap("foo=bar&baz=ö").asByteSource(ISO_8859_1);
             String contentType1 = MediaType.FORM_DATA.withCharset(UTF_8).toString();
             String contentType2 = MediaType.FORM_DATA.withCharset(ISO_8859_1).toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType1, body2, contentType2);
+            boolean same = isAboveDefault(body1, contentType1, body2, contentType2);
             assertTrue("same body when parameters are and different charsets used", same);
         }
 
@@ -247,7 +273,7 @@ public class BasicHeuristicTest {
             ByteSource body2 = CharSource.wrap("baz=ö&foo=bar").asByteSource(ISO_8859_1);
             String contentType1 = MediaType.FORM_DATA.withCharset(UTF_8).toString();
             String contentType2 = MediaType.FORM_DATA.withCharset(ISO_8859_1).toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType1, body2, contentType2);
+            boolean same = isAboveDefault(body1, contentType1, body2, contentType2);
             assertTrue("same body when parameters are and different charsets used", same);
         }
 
@@ -255,7 +281,7 @@ public class BasicHeuristicTest {
         public void isSameBody_octetStreams_yes() throws Exception {
             ByteSource body = CharSource.wrap("hello, world").asByteSource(UTF_8);
             String contentType = MediaType.OCTET_STREAM.toString();
-            boolean same = BasicHeuristic.isSameBody(body, contentType, body, contentType);
+            boolean same = isAboveDefault(body, contentType, body, contentType);
             assertTrue("same body", same);
         }
 
@@ -264,30 +290,30 @@ public class BasicHeuristicTest {
             ByteSource body1 = CharSource.wrap("hello, world").asByteSource(UTF_8);
             ByteSource body2 = CharSource.wrap("world, hello").asByteSource(UTF_8);
             String contentType = MediaType.OCTET_STREAM.toString();
-            boolean same = BasicHeuristic.isSameBody(body1, contentType, body2, contentType);
+            boolean same = isAboveDefault(body1, contentType, body2, contentType);
             assertFalse("same body", same);
         }
 
         @Test
         public void isSameBody_bothEmpty_contentTypeAbsent() throws Exception {
-            assertTrue("same body (empty)", BasicHeuristic.isSameBody(ByteSource.empty(), null, ByteSource.empty(), null));
+            assertTrue("same body (empty)", isAboveDefault(ByteSource.empty(), null, ByteSource.empty(), null));
         }
 
         @Test
         public void isSameBody_bothEmpty_contentTypeFormData() throws Exception {
             String ct = MediaType.FORM_DATA.toString();
-            assertTrue("same body (empty)", BasicHeuristic.isSameBody(ByteSource.empty(), ct, ByteSource.empty(), ct));
+            assertTrue("same body (empty)", isAboveDefault(ByteSource.empty(), ct, ByteSource.empty(), ct));
         }
 
         @Test
         public void isSameBody_bothEmpty_contentTypeOctetStream() throws Exception {
             String contentType = MediaType.OCTET_STREAM.toString();
-            assertTrue("same body (empty)", BasicHeuristic.isSameBody(ByteSource.empty(), contentType, ByteSource.empty(), contentType));
+            assertTrue("same body (empty)", isAboveDefault(ByteSource.empty(), contentType, ByteSource.empty(), contentType));
         }
 
         @Test
         public void isSameBody_bothEmpty_contentTypeDifferent() throws Exception {
-            assertTrue("same body (empty)", BasicHeuristic.isSameBody(ByteSource.empty(), MediaType.PNG.toString(), ByteSource.empty(), MediaType.JPEG.toString()));
+            assertTrue("same body (empty)", isAboveDefault(ByteSource.empty(), MediaType.PNG.toString(), ByteSource.empty(), MediaType.JPEG.toString()));
         }
     }
 }
