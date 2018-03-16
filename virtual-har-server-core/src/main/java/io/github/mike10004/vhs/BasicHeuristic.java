@@ -12,6 +12,7 @@ import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -19,13 +20,14 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Implementation of a heuristic that compares request headers, parameters, and bodies.
@@ -40,15 +42,59 @@ public class BasicHeuristic implements Heuristic {
     private static final int DEFAULT_INCREMENT = 100;
     private final int increment;
     private final int halfIncrement;
+    private final FormDataDecoder formDataDecoder;
 
     public BasicHeuristic() {
-        this(DEFAULT_INCREMENT);
+        this(DEFAULT_INCREMENT, new RepackagedHttpClientFormDataDecoder());
     }
 
+    @SuppressWarnings("unused")
     public BasicHeuristic(int increment) {
+        this(increment, new RepackagedHttpClientFormDataDecoder());
+    }
+
+    public BasicHeuristic(int increment, FormDataDecoder formDataDecoder) {
         this.increment = increment;
         checkArgument(increment % 2 == 0, "increment must be even: %s", increment);
         this.halfIncrement = this.increment / 2;
+        this.formDataDecoder = requireNonNull(formDataDecoder);
+    }
+
+    interface FormDataDecoder {
+        Multimap<String, Optional<String>> decode(ByteSource body, MediaType contentType) throws IOException;
+    }
+
+    static class RepackagedHttpClientFormDataDecoder implements FormDataDecoder {
+
+        @Override
+        public Multimap<String, Optional<String>> decode(ByteSource body, MediaType mediaType) throws IOException {
+            /*
+             * Content-type magic here is a little weird. I *think* that form data should
+             * always be US-ASCII, just like query parameters are supposed to be. The request
+             * body ought to be accompanied by a content-type header that specifies the charset,
+             * but if the charset is not specified, what do we do? Assume ISO-8859-1 as we do
+             * for other HTTP-transported data? Or assume UTF-8 as we frequently do with query
+             * parameters? Currently, we're defaulting to ISO-8859-1, because that would seem
+             * to be more in line with the HTTP spec, and I have no strong opinion.
+             */
+
+
+                Charset charset = mediaType.charset().or(DEFAULT_FORM_DATA_CHARSET);
+                String queryString = body.asCharSource(charset).read();
+                // It's possible that the charset for decoding parameters, specified as an argument
+                // here, is not necessarily the same as the content-type charset
+                List<Map.Entry<String, String>> params = URLEncodedUtils.parse(queryString, charset);
+                if (params != null) {
+                    Multimap<String, Optional<String>> mm = ArrayListMultimap.create();
+                    params.stream()
+                            .map(p -> new SimpleImmutableEntry<>(p.getKey(), Optional.ofNullable(p.getValue())))
+                            .forEach(p -> mm.put(p.getKey(), p.getValue()));
+                    return mm;
+                } else {
+                    return ImmutableMultimap.of();
+                }
+
+        }
     }
 
     protected int rateQuerySameness(@Nullable Multimap<String, Optional<String>> entryQuery, @Nullable Multimap<String, Optional<String>> requestQuery) {
@@ -123,39 +169,29 @@ public class BasicHeuristic implements Heuristic {
     }
 
     protected int rateBodySameness(ParsedRequest entryRequest, ParsedRequest request) {
-        ByteSource requestBody = bodyToByteSource(request);
-        ByteSource entryBody = bodyToByteSource(entryRequest);
+        ByteSource requestBody = getBodyAsByteSource(request);
+        ByteSource entryBody = getBodyAsByteSource(entryRequest);
         @Nullable String entryContentType = entryRequest.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
         @Nullable String requestContentType = request.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
         return rateBodySameness(entryBody, entryContentType, requestBody, requestContentType);
     }
 
     @Nullable
-    private static Multimap<String, Optional<String>> parseIfWwwFormData(ByteSource body, @Nullable String contentType) {
+    private Multimap<String, Optional<String>> parseIfWwwFormData(ByteSource body, @Nullable String contentType) {
         if (contentType != null) {
             try {
                 MediaType mediaType = MediaType.parse(contentType);
                 if (MediaType.FORM_DATA.withoutParameters().equals(mediaType.withoutParameters())) {
-                    Charset charset = mediaType.charset().or(DEFAULT_FORM_DATA_CHARSET);
-                    String queryString = body.asCharSource(charset).read();
-                    List<Map.Entry<String, String>> params = URLEncodedUtils.parse(queryString, charset);
-                    if (params != null) {
-                        Multimap<String, Optional<String>> mm = ArrayListMultimap.create();
-                        params.stream()
-                                .map(p -> new AbstractMap.SimpleImmutableEntry<>(p.getKey(), Optional.ofNullable(p.getValue())))
-                                .forEach(p -> mm.put(p.getKey(), p.getValue()));
-                        return mm;
-                    } else {
-                        return ImmutableMultimap.of();
-                    }
+                    return formDataDecoder.decode(body, mediaType);
                 }
             } catch (RuntimeException | IOException ignore) {
+                LoggerFactory.getLogger(getClass()).debug("failed to decode body as form data params");
             }
         }
         return null;
     }
 
-    int rateBodySameness(ByteSource entryBody, @Nullable String entryContentType, ByteSource requestBody, @Nullable String requestContentType) {
+    protected int rateBodySameness(ByteSource entryBody, @Nullable String entryContentType, ByteSource requestBody, @Nullable String requestContentType) {
         if (entryBody.sizeIfKnown().equals(requestBody.sizeIfKnown())) {
             if (entryBody.sizeIfKnown().isPresent() && entryBody.sizeIfKnown().get().equals(0L)) {
                 return increment;
@@ -175,7 +211,7 @@ public class BasicHeuristic implements Heuristic {
         }
     }
 
-    private static ByteSource bodyToByteSource(ParsedRequest request) {
+    private static ByteSource getBodyAsByteSource(ParsedRequest request) {
         return new ByteSource() {
             @Override
             public InputStream openStream() throws IOException {

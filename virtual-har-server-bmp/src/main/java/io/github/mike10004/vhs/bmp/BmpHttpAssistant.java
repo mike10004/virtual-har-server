@@ -10,7 +10,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

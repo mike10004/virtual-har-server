@@ -3,15 +3,22 @@ package io.github.mike10004.vhs.bmp;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
+import com.google.common.io.BaseEncoding;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
+import com.google.common.net.MediaType;
 import com.machinepublishers.jbrowserdriver.JBrowserDriver;
 import com.machinepublishers.jbrowserdriver.ProxyConfig;
 import com.machinepublishers.jbrowserdriver.Settings;
 import de.sstoehr.harreader.HarReaderException;
+import de.sstoehr.harreader.model.HarContent;
 import de.sstoehr.harreader.model.HarEntry;
+import de.sstoehr.harreader.model.HarHeader;
+import de.sstoehr.harreader.model.HarRequest;
+import de.sstoehr.harreader.model.HarResponse;
+import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.BasicHeuristic;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryMatcherFactory;
@@ -33,6 +40,7 @@ import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.ssl.SSLContexts;
+import org.apache.http.util.EntityUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.openqa.selenium.WebDriver;
@@ -44,17 +52,20 @@ import javax.net.ssl.SSLContext;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -208,6 +219,23 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         }
     }
 
+    private static class ErrorNoticeListener implements BmpResponseListener {
+        public final Collection<ErrorResponseNotice> errorNotices;
+
+        public ErrorNoticeListener() {
+            this(new ArrayList<>());
+        }
+
+        public ErrorNoticeListener(Collection<ErrorResponseNotice> errorNotices) {
+            this.errorNotices = errorNotices;
+        }
+        @Override
+        public void respondingWithError(ParsedRequest request, int status) {
+            System.out.format("responding %s to %s %s%n", status, request.method, request.url);
+            errorNotices.add(new ErrorResponseNotice(request, status));
+        }
+    }
+
     @Test
     public void javascriptRedirect() throws Exception {
         org.apache.http.client.utils.URLEncodedUtils.class.getName();
@@ -217,14 +245,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         Resources.asByteSource(getClass().getResource("/javascript-redirect.har")).copyTo(Files.asByteSink(harFile));
         URI startUrl = URI.create("https://www.redi123.com/");
         URI finalUrl = new URIBuilder(startUrl).setPath("/other.html").build();
-        List<ErrorResponseNotice> errorNotices = new ArrayList<>();
-        BmpResponseListener errorResponseAccumulator = new BmpResponseListener() {
-            @Override
-            public void respondingWithError(ParsedRequest request, int status) {
-                System.out.format("responding %s to %s %s%n", status, request.method, request.url);
-                errorNotices.add(new ErrorResponseNotice(request, status));
-            }
-        };
+        ErrorNoticeListener errorResponseAccumulator = new ErrorNoticeListener();
         HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList(), errorResponseAccumulator);
         KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest("localhost");
         NanohttpdTlsEndpointFactory tlsEndpointFactory = NanohttpdTlsEndpointFactory.create(keystoreData, null);
@@ -257,10 +278,10 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
             }
         }
         System.out.format("final page source:%n%s%n", finalPageSource);
-        errorNotices.forEach(System.out::println);
+        errorResponseAccumulator.errorNotices.forEach(System.out::println);
         assertNotNull("final page source", finalPageSource);
         assertTrue("redirect text", finalPageSource.contains(EXPECTED_FINAL_REDIRECT_TEXT));
-        assertEquals("error notices", ImmutableList.of(), errorNotices);
+        assertEquals("error notices", ImmutableList.of(), errorResponseAccumulator.errorNotices);
     }
 
     private static BmpResponseListener newLoggingResponseListener() {
@@ -328,5 +349,41 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         assertEquals("num responses", 1, responses.size());
         ResponseSummary response = responses.values().iterator().next();
         assertEquals("response status", HttpStatus.SC_BAD_GATEWAY, response.statusLine.getStatusCode());
+    }
+
+    @Test
+    public void unspecifiedEncoding() throws Exception {
+        String HEX_BYTES = "E29C93";
+        byte[] bytes = BaseEncoding.base16().decode(HEX_BYTES);
+        String text = new String(bytes, StandardCharsets.UTF_8);
+        System.out.format("text: %s%n", text);
+        String url = "http://www.example.com/gimme-difficult-text";
+        HarRequest request = BmpTests.buildHarRequest(HttpMethod.GET, url, ImmutableList.of());
+        MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withoutParameters();
+        System.out.format("content-type: %s%n", contentType);
+        HarContent responseContent = BmpTests.buildHarContent(text, contentType);
+        List<HarHeader> responseHeaders = BmpTests.buildHarHeaders(HttpHeaders.CONTENT_TYPE, contentType.toString());
+        HarResponse response = BmpTests.buildHarResponse(200, responseHeaders, responseContent);
+        HarEntry entry = BmpTests.buildHarEntry(request, response);
+        List<HarEntry> entries = ImmutableList.of(entry);
+        BmpResponseManufacturer responseManufacturer = BmpTests.createManufacturer(entries, Collections.emptyList(), newLoggingResponseListener());
+        BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(responseManufacturer)
+                .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
+                .build();
+        VirtualHarServer server = new BrowsermobVirtualHarServer(config);
+        Multimap<URI, byte[]> responses;
+        try (VirtualHarServerControl ctrl = server.start()) {
+            ApacheRawClient<byte[]> client = new ApacheRawClient<byte[]>() {
+                @Override
+                protected byte[] transform(URI requestUrl, org.apache.http.HttpResponse response) throws IOException {
+                    return EntityUtils.toByteArray(response.getEntity());
+                }
+            };
+            responses = client.collectResponses(Collections.singleton(URI.create(url)), ctrl.getSocketAddress());
+        }
+        assertEquals("num responses", 1, responses.size());
+        byte[] actual = responses.values().iterator().next();
+        System.out.format("expecting %s, actual = %s%n", HEX_BYTES, BaseEncoding.base16().encode(actual));
+        assertArrayEquals("response data", bytes, actual);
     }
 }

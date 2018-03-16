@@ -9,6 +9,7 @@ import io.github.mike10004.vhs.HeuristicEntryMatcher;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
 import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -146,7 +147,43 @@ public abstract class VirtualHarServerTestBase {
         assertEquals("response to " + oneUri, "one", oneResponse.entity);
     }
 
-    protected static class ApacheRecordingClient {
+    protected static abstract class ApacheRawClient<T> {
+
+        public ApacheRawClient() {
+        }
+
+        protected void configureHttpClientBuilder(HttpClientBuilder b, @Nullable HostAndPort proxy) throws Exception {
+            if (proxy != null) {
+                b.setProxy(new HttpHost(proxy.getHost(), proxy.getPort()));
+            }
+            b.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false));
+        }
+
+        protected abstract T transform(URI requestUrl, HttpResponse response) throws IOException;
+
+        public Multimap<URI, T> collectResponses(Iterable<URI> urisToGet, @Nullable HostAndPort proxy) throws Exception {
+            Multimap<URI, T> result = ArrayListMultimap.create();
+            HttpClientBuilder clientBuilder = HttpClients.custom();
+            configureHttpClientBuilder(clientBuilder, proxy);
+            try (CloseableHttpClient client = clientBuilder.build()) {
+                for (URI uri : urisToGet) {
+                    System.out.format("fetching %s%n", uri);
+                    HttpGet get = new HttpGet(transformUri(uri));
+                    try (CloseableHttpResponse response = client.execute(get)) {
+                        T responseSummary = transform(uri, response);
+                        result.put(uri, responseSummary);
+                    }
+                }
+            }
+            return result;
+        }
+
+        protected URI transformUri(URI uri) {
+            return uri;
+        }
+    }
+
+    protected static class ApacheRecordingClient extends ApacheRawClient<ResponseSummary> {
 
         private final boolean transformHttpsToHttp;
 
@@ -154,7 +191,8 @@ public abstract class VirtualHarServerTestBase {
             this.transformHttpsToHttp = transformHttpsToHttp;
         }
 
-        private URI transformUri(URI uri) { // equivalent of switcheroo extension
+        @Override
+        protected URI transformUri(URI uri) { // equivalent of switcheroo extension
             if (transformHttpsToHttp && "https".equals(uri.getScheme())) {
                 try {
                     return new URIBuilder(uri).setScheme("http").build();
@@ -166,30 +204,12 @@ public abstract class VirtualHarServerTestBase {
             }
         }
 
-        protected void configureHttpClientBuilder(HttpClientBuilder b, @Nullable HostAndPort proxy) throws Exception {
-            if (proxy != null) {
-                b.setProxy(new HttpHost(proxy.getHost(), proxy.getPort()));
-            }
-            b.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false));
-        }
-
-        public Multimap<URI, ResponseSummary> collectResponses(Iterable<URI> urisToGet, @Nullable HostAndPort proxy) throws Exception {
-            Multimap<URI, ResponseSummary> result = ArrayListMultimap.create();
-            HttpClientBuilder clientBuilder = HttpClients.custom();
-            configureHttpClientBuilder(clientBuilder, proxy);
-            try (CloseableHttpClient client = clientBuilder.build()) {
-                for (URI uri : urisToGet) {
-                    System.out.format("fetching %s%n", uri);
-                    HttpGet get = new HttpGet(transformUri(uri));
-                    try (CloseableHttpResponse response = client.execute(get)) {
-                        StatusLine statusLine = response.getStatusLine();
-                        System.out.format("received %s from %s%n", statusLine, uri);
-                        String entity = EntityUtils.toString(response.getEntity());
-                        result.put(uri, new ResponseSummary(statusLine, entity));
-                    }
-                }
-            }
-            return result;
+        @Override
+        protected ResponseSummary transform(URI requestUrl, HttpResponse response) throws IOException {
+            StatusLine statusLine = response.getStatusLine();
+            System.out.format("received %s from %s%n", statusLine, requestUrl);
+            String entity = EntityUtils.toString(response.getEntity());
+            return new ResponseSummary(statusLine, entity);
         }
     }
 

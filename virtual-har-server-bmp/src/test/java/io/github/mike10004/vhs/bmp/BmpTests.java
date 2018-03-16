@@ -1,9 +1,15 @@
 package io.github.mike10004.vhs.bmp;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.net.MediaType;
 import de.sstoehr.harreader.HarReaderException;
+import de.sstoehr.harreader.HarReaderMode;
+import de.sstoehr.harreader.jackson.ExceptionIgnoringIntegerDeserializer;
+import de.sstoehr.harreader.jackson.MapperFactory;
 import de.sstoehr.harreader.model.HarEntry;
 import io.github.mike10004.vhs.BasicHeuristic;
 import io.github.mike10004.vhs.EntryMatcher;
@@ -17,6 +23,8 @@ import io.github.mike10004.vhs.harbridge.sstoehr.SstoehrHarBridge;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -59,13 +67,23 @@ public class BmpTests {
         return keystoreDataCache.get(certificateCommonName);
     }
 
-    public static HarReplayManufacturer createManufacturer(File harFile, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) throws IOException {
-        List<HarEntry> entries;
-        try {
-            entries = new de.sstoehr.harreader.HarReader().readFromFile(harFile).getLog().getEntries();
-        } catch (HarReaderException e) {
-            throw new IOException(e);
-        }
+    private static MapperFactory tolerantMapperFactory() {
+        return new MapperFactory() {
+            @Override
+            public ObjectMapper instance(HarReaderMode mode) {
+                ObjectMapper mapper = new ObjectMapper();
+                SimpleModule module = new SimpleModule();
+                module.addDeserializer(Date.class, new TolerantDateDeserializer());
+                if (mode == HarReaderMode.LAX) {
+                    module.addDeserializer(Integer.class, new ExceptionIgnoringIntegerDeserializer());
+                }
+                mapper.registerModule(module);
+                return mapper;
+            }
+        };
+    }
+
+    public static HarReplayManufacturer createManufacturer(List<HarEntry> entries, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) throws IOException {
         System.out.println("requests contained in HAR:");
         entries.stream().map(HarEntry::getRequest).forEach(request -> {
             System.out.format("  %s %s%n", request.getMethod(), request.getUrl());
@@ -76,4 +94,55 @@ public class BmpTests {
         return new HarReplayManufacturer(entryMatcher, responseInterceptors, responseListener);
     }
 
+    public static HarReplayManufacturer createManufacturer(File harFile, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) throws IOException {
+        List<HarEntry> entries;
+        try {
+            entries = new de.sstoehr.harreader.HarReader(tolerantMapperFactory()).readFromFile(harFile).getLog().getEntries();
+        } catch (HarReaderException e) {
+            throw new IOException(e);
+        }
+        return createManufacturer(entries, responseInterceptors, responseListener);
+    }
+
+    public static HarEntry buildHarEntry(de.sstoehr.harreader.model.HarRequest request, de.sstoehr.harreader.model.HarResponse response) {
+        HarEntry entry = new HarEntry();
+        entry.setRequest(request);
+        entry.setResponse(response);
+        return entry;
+    }
+
+    public static de.sstoehr.harreader.model.HarRequest buildHarRequest(de.sstoehr.harreader.model.HttpMethod method, String url, List<de.sstoehr.harreader.model.HarHeader> headers) {
+        de.sstoehr.harreader.model.HarRequest request = new de.sstoehr.harreader.model.HarRequest();
+        request.setUrl(url);
+        request.setMethod(method);
+        request.setHeaders(headers);
+        return request;
+    }
+
+    public static de.sstoehr.harreader.model.HarResponse buildHarResponse(int status, List<de.sstoehr.harreader.model.HarHeader> headers, de.sstoehr.harreader.model.HarContent content) {
+        de.sstoehr.harreader.model.HarResponse response = new de.sstoehr.harreader.model.HarResponse();
+        response.setHeaders(headers);
+        response.setStatus(status);
+        response.setContent(content);
+        return response;
+    }
+
+    public static List<de.sstoehr.harreader.model.HarHeader> buildHarHeaders(String...namesAndValues) {
+        List<de.sstoehr.harreader.model.HarHeader> headers = new ArrayList<>();
+        for (int i = 0; i < namesAndValues.length; i += 2) {
+            String name = namesAndValues[i], value = namesAndValues[i + 1];
+            de.sstoehr.harreader.model.HarHeader h = new de.sstoehr.harreader.model.HarHeader();
+            h.setName(name);
+            h.setValue(value);
+            headers.add(h);
+        }
+        return headers;
+    }
+
+    public static de.sstoehr.harreader.model.HarContent buildHarContent(String text, MediaType contentType) {
+        de.sstoehr.harreader.model.HarContent content = new de.sstoehr.harreader.model.HarContent();
+        content.setText(text);
+        content.setMimeType(contentType.toString());
+        return content;
+    }
 }
