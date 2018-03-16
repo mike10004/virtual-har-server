@@ -5,9 +5,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.BaseEncoding;
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Resources;
 import com.google.common.net.HttpHeaders;
+import com.google.common.net.MediaType;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -26,6 +29,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class HarsTest {
 
@@ -78,7 +82,7 @@ public class HarsTest {
                 response.get("bodySize").getAsLong(),
                 content.get("size").getAsLong(),
                 contentEncodingHeaderValue,
-                null, null).body.read();
+                null, null).getBodyOrNull().read();
         byte[] decompressed = gunzip(data);
         String decompressedText = new String(decompressed, StandardCharsets.UTF_8);
         assertEquals("text", text, decompressedText);
@@ -146,7 +150,7 @@ public class HarsTest {
                 content.get("size").getAsLong(),
                 contentEncodingHeaderValue,
                 null, null);
-        String responseText = result.body.asCharSource(StandardCharsets.UTF_8).read();
+        String responseText = result.getBodyOrNull().asCharSource(StandardCharsets.UTF_8).read();
         assertEquals("text", text, responseText);
 
     }
@@ -156,11 +160,25 @@ public class HarsTest {
         ParsedRequest request = buildRequest("br");
         String text = "hello, world";
         ResponseContentTranslation translation = Hars.translateResponseContent(request, "text/plain", text, (long) text.length(), (long) text.length(), HttpContentCodecs.CONTENT_ENCODING_BROTLI, null, null);
-        String actual = translation.body.asCharSource(StandardCharsets.US_ASCII).read();
+        String actual = translation.getBodyOrNull().asCharSource(StandardCharsets.US_ASCII).read();
         assertEquals("decoded", text, actual);
         Map.Entry<String, String> originalHeader = new AbstractMap.SimpleImmutableEntry<>(HttpHeaders.CONTENT_ENCODING, HttpContentCodecs.CONTENT_ENCODING_BROTLI);
         Map.Entry<String, String> modifiedHeader = translation.headerMap.apply(originalHeader);
         assertEquals("name", originalHeader.getKey(), modifiedHeader.getKey());
         assertEquals("value", HttpContentCodecs.CONTENT_ENCODING_IDENTITY, modifiedHeader.getValue());
+    }
+
+    @Test
+    public void getUncompressedContent() throws Exception {
+        String HEX_BYTES = "E29C93";
+        byte[] bytes = BaseEncoding.base16().decode(HEX_BYTES);
+        String text = new String(bytes, StandardCharsets.UTF_8);
+        System.out.format("text: %s%n", text);
+        MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withoutParameters();
+        ResponseContentTranslation translation = Hars.getUncompressedContent(contentType.toString(), text, null, null, null, Hars.MessageDirection.RESPONSE);
+        ByteSource data = translation.getBodyOrNull();
+        assertNotNull("data", data);
+        String hexActual = BaseEncoding.base16().encode(data.read());
+        assertEquals("result", HEX_BYTES, hexActual);
     }
 }

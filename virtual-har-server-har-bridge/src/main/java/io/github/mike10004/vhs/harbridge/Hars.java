@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Iterator;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
@@ -117,7 +119,8 @@ public class Hars {
         return CharSource.wrap(formString).asByteSource(charset);
     }
 
-    private enum MessageDirection {
+    @VisibleForTesting
+    enum MessageDirection {
         REQUEST, RESPONSE;
 
         public final Charset DEFAULT_CHARSET = DEFAULT_HTML_CHARSET;
@@ -127,6 +130,7 @@ public class Hars {
      * Encodes HAR response content data or request post-data as bytes.
      * If the data is base-64-encoded, then this just decodes it.
      * If the data is a string, then this encodes that in the charset specified by the content-type.
+     *
      * @param contentType the content type (required)
      * @param text the content or POST-data text
      * @param length the content length or size field
@@ -136,63 +140,103 @@ public class Hars {
      */
     @Nullable
     public static ByteSource translateRequestContent(String contentType,
-                                          @Nullable String text,
-                                          @Nullable Long length,
-                                          @Nullable String harContentEncoding,
-                                          @SuppressWarnings("unused") @Nullable String comment) {
+                                                     @Nullable String text,
+                                                     @Nullable Long length,
+                                                     @Nullable String harContentEncoding,
+                                                     @SuppressWarnings("unused") @Nullable String comment) {
         MessageDirection direction = MessageDirection.REQUEST;
-        return getUncompressedContent(contentType, text, length, harContentEncoding, comment, direction);
+        return getUncompressedContent(contentType, text, length, harContentEncoding, comment, direction).getBodyOrNull();
     }
 
     public static class ResponseContentTranslation {
-        public final ByteSource body;
+
+        @Nullable
+        private final ByteSource body;
         public final Function<Map.Entry<String, String>, Map.Entry<String, String>> headerMap;
 
-        public ResponseContentTranslation(ByteSource body, Function<Entry<String, String>, Entry<String, String>> headerMap) {
+        public ResponseContentTranslation(@Nullable ByteSource body, Function<Entry<String, String>, Entry<String, String>> headerMap) {
             this.body = body;
             this.headerMap = headerMap;
         }
 
-        public static ResponseContentTranslation withIdentityHeaderMap(ByteSource body) {
+        public boolean isEmpty() {
+            return body == null;
+        }
+
+        public static ResponseContentTranslation identity(@Nullable ByteSource body) {
             return new ResponseContentTranslation(body, Function.identity());
         }
 
-        public static Builder builder(ByteSource byteSource) {
-            return new Builder(byteSource);
+        public ResponseContentTranslation applyMap(Function<Map.Entry<String, String>, Map.Entry<String, String>> map) {
+            return new ResponseContentTranslation(body, this.headerMap.andThen(map));
         }
 
-        public static class Builder {
-            private final ByteSource body;
-            private Function<Map.Entry<String, String>, Map.Entry<String, String>> headerMap;
+        private static abstract class HeaderValueTransform implements Function<Map.Entry<String, String>, Map.Entry<String, String>> {
 
-            public Builder(ByteSource body) {
-                this.body = body;
-                headerMap = Function.identity();
-            }
-
-            public Builder applyMap(Function<Map.Entry<String, String>, Map.Entry<String, String>> map) {
-                this.headerMap = this.headerMap.andThen(map);
-                return this;
-            }
-
-            private static final Function<Map.Entry<String, String>, Map.Entry<String, String>> SET_CONTENT_ENCODING_HEADER_TO_IDENTITY = entry -> {
-                if (HttpHeaders.CONTENT_ENCODING.equalsIgnoreCase(entry.getKey())) {
-                    String value = entry.getValue();
-                    if (value == null || value.isEmpty() || value.equalsIgnoreCase("identity")) {
-                        return entry;
-                    }
-                    return new SimpleImmutableEntry<>(entry.getKey(), "identity");
+            @Override
+            public Map.Entry<String, String> apply(Map.Entry<String, String> entry) {
+                String name = entry.getKey();
+                String value = apply(name, entry.getValue());
+                if (Objects.equals(entry.getValue(), value)) {
+                    return entry;
+                } else {
+                    return new SimpleImmutableEntry<>(name, value);
                 }
-                return entry;
-            };
-
-            public Builder setContentEncodingHeaderToIdentity() {
-                return applyMap(SET_CONTENT_ENCODING_HEADER_TO_IDENTITY);
             }
 
-            public ResponseContentTranslation build() {
-                return new ResponseContentTranslation(body, headerMap);
+            protected abstract String apply(String name, String value);
+
+            public static HeaderValueTransform on(String relevantName, BiFunction<String, String, String> application) {
+                requireNonNull(relevantName);
+                requireNonNull(application);
+                return new HeaderValueTransform() {
+                    @Override
+                    protected String apply(String name, String value) {
+                        if (relevantName.equalsIgnoreCase(name)) {
+                            return application.apply(name, value);
+                        }
+                        return value;
+                    }
+                };
             }
+        }
+
+        private static final HeaderValueTransform SET_CONTENT_ENCODING_HEADER_TO_IDENTITY = HeaderValueTransform.on(HttpHeaders.CONTENT_ENCODING, (name, value) -> {
+            if (value == null || value.isEmpty() || value.equalsIgnoreCase("identity")) {
+                return value;
+            }
+            return "identity";
+        });
+
+        public ResponseContentTranslation setContentEncodingHeaderToIdentity() {
+            return applyMap(SET_CONTENT_ENCODING_HEADER_TO_IDENTITY);
+        }
+
+        public byte[] readBytes() throws IOException {
+            return body == null ? new byte[0] : body.read();
+        }
+
+        @Nullable
+        public ByteSource getBodyOrNull() {
+            return body;
+        }
+
+        private static HeaderValueTransform contentTypeCharsetMapper(Charset charset) {
+            return HeaderValueTransform.on(HttpHeaders.CONTENT_TYPE, (name, value) -> {
+                if (Strings.nullToEmpty(value).trim().isEmpty()) {
+                    return value;
+                }
+                try {
+                    MediaType mediatype = MediaType.parse(value);
+                    return mediatype.withCharset(charset).toString();
+                } catch (RuntimeException ignore) {
+                    return value;
+                }
+            });
+        }
+
+        public ResponseContentTranslation changeContentTypeCharset(Charset adjustedCharset) {
+            return applyMap(contentTypeCharsetMapper(adjustedCharset));
         }
     }
 
@@ -376,13 +420,19 @@ public class Hars {
                                                       @Nullable String harContentEncoding,
                                                       @SuppressWarnings("unused") @Nullable String comment) {
         MessageDirection direction = MessageDirection.RESPONSE;
-        @Nullable ByteSource uncompressed = getUncompressedContent(contentType, text, bodySize, harContentEncoding, comment, direction);
-        if (uncompressed == null) {
-            return ResponseContentTranslation.withIdentityHeaderMap(null);
+        ResponseContentTranslation baseReturnValue = getUncompressedContent(contentType, text, bodySize, harContentEncoding, comment, direction);
+        if (baseReturnValue.isEmpty()) {
+            return baseReturnValue;
         }
-        ResponseContentTranslation uncompressedReturnValue = ResponseContentTranslation.builder(uncompressed).setContentEncodingHeaderToIdentity().build();
-        if (bodySize == null || contentSize == null || Objects.equals(bodySize, contentSize)) {
-            return uncompressedReturnValue;
+        ResponseContentTranslation unencodedReturnValue = baseReturnValue
+                .setContentEncodingHeaderToIdentity();
+        if (bodySize == null || contentSize == null) {
+            log.info("at least one of [response bodySize, content size] = [{}, {}] is null; returning uncompressed data instead of trying to figure out compression", bodySize, contentSize);
+            return unencodedReturnValue;
+        }
+        if (Objects.equals(bodySize, contentSize)) {
+            log.debug("response body size equals response content size; assuming the data is not compressed (but this would be wrong if the compressed data is exactly the same size as the uncompressed)");
+            return unencodedReturnValue;
         }
         if (contentSize.longValue() < bodySize.longValue()) {
             log.debug("contentSize {} < bodySize {}; this either violates HAR spec or compression added to byte count", contentSize, bodySize);
@@ -395,32 +445,32 @@ public class Hars {
         String acceptEncodingHeaderValue = request.getFirstHeaderValue(HttpHeaders.ACCEPT_ENCODING);
         List<String> encodings = parseContentEncodings(contentEncodingHeaderValue);
         if (!canServeOriginalResponseContentEncoding(encodings, acceptEncodingHeaderValue)) {
-            return uncompressedReturnValue;
+            return unencodedReturnValue;
         }
         // TODO delay buffering of the data by composing compressing byte sinks into a byte source
         byte[] data;
         try {
-            data = uncompressed.read();
+            data = unencodedReturnValue.readBytes();
         } catch (IOException e) {
             log.warn("failed to read uncompressed data; returning as-is", e);
-            return uncompressedReturnValue;
+            return unencodedReturnValue;
         }
         boolean anyChanges = false;
         for (String encoding : encodings) {
             HttpContentCodec compressor = HttpContentCodecs.getCodec(encoding);
             if (compressor == null) {
                 log.warn("failed to compress data because {} is not supported; this will likely flummox some user agents", encoding);
-                return uncompressedReturnValue;
+                return unencodedReturnValue;
             }
             try {
                 data = compressor.compress(data);
                 anyChanges = true;
             } catch (IOException e) {
                 log.warn("failed to compress data with " + encoding + "; returning uncompressed", e);
-                return uncompressedReturnValue;
+                return unencodedReturnValue;
             }
         }
-        return ResponseContentTranslation.builder(anyChanges ? ByteSource.wrap(data) : uncompressed).build();
+        return anyChanges ? ResponseContentTranslation.identity(ByteSource.wrap(data)) : unencodedReturnValue;
     }
 
     /**
@@ -428,15 +478,15 @@ public class Hars {
      * in a HAR entry, given the various HAR response and HAR content fields that describe it.
      * @return a byte source that supplies a stream of the response body as unencoded, uncompressed bytes
      */
-    @Nullable
-    private static ByteSource getUncompressedContent(String contentType,
+    @VisibleForTesting
+    static ResponseContentTranslation getUncompressedContent(String contentType,
                                                      @Nullable String text,
                                                      @Nullable Long length,
                                                      @Nullable String harContentEncoding,
                                                      @SuppressWarnings("unused") @Nullable String comment,
                                                      MessageDirection direction) {
         if (text == null) {
-            return null;
+            return ResponseContentTranslation.identity(null);
         }
         requireNonNull(contentType, "content type must be non-null");
         if (length != null) {
@@ -445,15 +495,33 @@ public class Hars {
         }
         boolean base64 = isBase64Encoded(contentType, text, harContentEncoding, length);
         if (base64) {
-            return BaseEncoding.base64().decodingSource(CharSource.wrap(text));
+            ByteSource data = BaseEncoding.base64().decodingSource(CharSource.wrap(text));
+            return ResponseContentTranslation.identity(data);
         } else {
             Charset charset = direction.DEFAULT_CHARSET;
             try {
                 charset = MediaType.parse(contentType).charset().or(charset);
             } catch (RuntimeException ignore) {
             }
-            return CharSource.wrap(text).asByteSource(charset);
+            Charset adjustedCharset = detectCharset(text, charset);
+            if (charset.equals(adjustedCharset)) {
+                ByteSource data = CharSource.wrap(text).asByteSource(charset);
+                ResponseContentTranslation translated = ResponseContentTranslation.identity(data);
+                return translated;
+            } else {
+                ByteSource data = CharSource.wrap(text).asByteSource(adjustedCharset);
+                return ResponseContentTranslation.identity(data)
+                        .changeContentTypeCharset(adjustedCharset);
+            }
+
         }
     }
 
+    static Charset detectCharset(String text, Charset charset) {
+        CharsetEncoder encoder = charset.newEncoder();
+        if (encoder.canEncode(text)) {
+            return charset;
+        }
+        return StandardCharsets.UTF_8;
+    }
 }

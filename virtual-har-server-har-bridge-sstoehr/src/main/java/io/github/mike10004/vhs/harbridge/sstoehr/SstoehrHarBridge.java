@@ -123,7 +123,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
                 return Stream.empty();
             }
         };
-        return HarResponseData.of(headers, getResponseContentType(entry), contentTranslation.body);
+        return HarResponseData.of(headers, getResponseContentType(entry), contentTranslation.getBodyOrNull());
     }
 
     @Nullable
@@ -147,7 +147,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     private Hars.ResponseContentTranslation getResponseBody(ParsedRequest request, HarEntry entry) throws IOException {
         HarResponse rsp = entry.getResponse();
         if (rsp == null) {
-            return Hars.ResponseContentTranslation.withIdentityHeaderMap(ByteSource.empty());
+            return Hars.ResponseContentTranslation.identity(ByteSource.empty());
         }
         HarContent content = requireNonNull(rsp.getContent(), "response.content");
         @Nullable Long harContentSize = nullIfNegative(content.getSize());
