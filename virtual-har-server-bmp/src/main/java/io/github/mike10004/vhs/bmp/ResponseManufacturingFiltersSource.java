@@ -22,13 +22,13 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
 
     private final BmpResponseManufacturer responseManufacturer;
     private final HostRewriter hostRewriter;
-    private final BmpResponseFilter proxyToClientResponseFilter;
+    private final BmpResponseListener bmpResponseListener;
     private final PassthruPredicate passthruPredicate;
 
-    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseFilter proxyToClientResponseFilter, PassthruPredicate passthruPredicate) {
+    public ResponseManufacturingFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseListener bmpResponseListener, PassthruPredicate passthruPredicate) {
         this.responseManufacturer = requireNonNull(responseManufacturer);
         this.hostRewriter = requireNonNull(hostRewriter);
-        this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
+        this.bmpResponseListener = requireNonNull(bmpResponseListener);
         this.passthruPredicate = requireNonNull(passthruPredicate);
     }
 
@@ -54,7 +54,7 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
         if (ProxyUtils.isCONNECT(originalRequest)) {
             return createHostRewriteFilter(originalRequest, ctx, hostRewriter);
         } else {
-            return createResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
+            return createResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, bmpResponseListener);
         }
     }
 
@@ -62,8 +62,8 @@ class ResponseManufacturingFiltersSource extends HttpFiltersSourceAdapter {
         return new HostRewriteFilter(originalRequest, ctx, hostRewriter);
     }
 
-    /* package */ ResponseManufacturingFilter createResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseFilter proxyToClientResponseFilter) {
-        return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter);
+    /* package */ ResponseManufacturingFilter createResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseListener bmpResponseListener) {
+        return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, bmpResponseListener);
     }
 
     @VisibleForTesting

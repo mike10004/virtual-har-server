@@ -83,7 +83,7 @@ public class BmpTests {
         };
     }
 
-    public static HarReplayManufacturer createManufacturer(List<HarEntry> entries, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) throws IOException {
+    public static HarReplayManufacturer createManufacturer(List<HarEntry> entries, Iterable<ResponseInterceptor> responseInterceptors) throws IOException {
         System.out.println("requests contained in HAR:");
         entries.stream().map(HarEntry::getRequest).forEach(request -> {
             System.out.format("  %s %s%n", request.getMethod(), request.getUrl());
@@ -91,17 +91,17 @@ public class BmpTests {
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
         EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
-        return new HarReplayManufacturer(entryMatcher, responseInterceptors, responseListener);
+        return new HarReplayManufacturer(entryMatcher, responseInterceptors);
     }
 
-    public static HarReplayManufacturer createManufacturer(File harFile, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) throws IOException {
+    public static HarReplayManufacturer createManufacturer(File harFile, Iterable<ResponseInterceptor> responseInterceptors) throws IOException {
         List<HarEntry> entries;
         try {
             entries = new de.sstoehr.harreader.HarReader(tolerantMapperFactory()).readFromFile(harFile).getLog().getEntries();
         } catch (HarReaderException e) {
             throw new IOException(e);
         }
-        return createManufacturer(entries, responseInterceptors, responseListener);
+        return createManufacturer(entries, responseInterceptors);
     }
 
     public static HarEntry buildHarEntry(de.sstoehr.harreader.model.HarRequest request, de.sstoehr.harreader.model.HarResponse response) {

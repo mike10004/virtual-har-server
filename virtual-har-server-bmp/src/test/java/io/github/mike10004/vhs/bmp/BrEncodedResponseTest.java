@@ -158,14 +158,15 @@ public class BrEncodedResponseTest {
         checkState("br".equals(harResponseContentEncoding), "this test requires the entry response specify Content-Encoding: br");
         String expectedText = response.getContent().getText();
 
-        BmpResponseListener responseListener = (request, status) -> {
-            if (!"/favicon.ico".equals(request.url.getPath())) {
-                System.out.format("ERROR RESPONSE %s to %s%n", status, request);
+        BmpResponseListener responseListener = (requestCap, responseCap) -> {
+            if (!"/favicon.ico".equals(requestCap.request.url.getPath())) {
+                System.out.format("ERROR RESPONSE %s to %s%n", responseCap.response.getStatus().code(), requestCap.request);
             }
         };
-        BmpResponseManufacturer responseManufacturer = BmpTests.createManufacturer(harFile, ImmutableList.of(), responseListener);
+        BmpResponseManufacturer responseManufacturer = BmpTests.createManufacturer(harFile, ImmutableList.of());
         BrowsermobVhsConfig vhsConfig = BrowsermobVhsConfig.builder(responseManufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
+                .responseListener(responseListener)
                 .build();
         VirtualHarServer harServer = new BrowsermobVirtualHarServer(vhsConfig);
         String actualText;

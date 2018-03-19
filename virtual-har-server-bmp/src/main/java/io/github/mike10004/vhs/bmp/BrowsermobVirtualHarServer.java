@@ -76,7 +76,7 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
                                       CertificateAndKeySource certificateAndKeySource,
                                       TrustSource trustSource) throws IOException {
         BrowserMobProxy bmp = instantiateProxy();
-        configureProxy(bmp, responseManufacturer, httpsHostRewriteDestination, certificateAndKeySource, config.proxyToClientResponseFilter, trustSource);
+        configureProxy(bmp, responseManufacturer, httpsHostRewriteDestination, certificateAndKeySource, config.bmpResponseListener, trustSource);
         bmp.enableHarCaptureTypes(getCaptureTypes());
         bmp.newHar();
         if (config.port == null) {
@@ -109,16 +109,16 @@ public class BrowsermobVirtualHarServer implements VirtualHarServer {
                                   BmpResponseManufacturer responseManufacturer,
                                   HostAndPort httpsHostRewriteDestination,
                                   CertificateAndKeySource certificateAndKeySource,
-                                  BmpResponseFilter proxyToClientResponseFilter,
+                                  BmpResponseListener bmpResponseListener,
                                   TrustSource trustSource) {
         MitmManager mitmManager = createMitmManager(bmp, certificateAndKeySource, trustSource);
         bmp.setMitmManager(mitmManager);
         HostRewriter hostRewriter = HostRewriter.from(httpsHostRewriteDestination);
-        bmp.addFirstHttpFilterFactory(createFirstFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, createPassthruPredicate()));
+        bmp.addFirstHttpFilterFactory(createFirstFiltersSource(responseManufacturer, hostRewriter, bmpResponseListener, createPassthruPredicate()));
     }
 
-    /* package */ ResponseManufacturingFiltersSource createFirstFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseFilter proxyToClientResponseFilter, PassthruPredicate passthruPredicate) {
-        return new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, passthruPredicate);
+    /* package */ ResponseManufacturingFiltersSource createFirstFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseListener bmpResponseListener, PassthruPredicate passthruPredicate) {
+        return new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, bmpResponseListener, passthruPredicate);
     }
 
     class BrowsermobVhsControl implements VirtualHarServerControl {

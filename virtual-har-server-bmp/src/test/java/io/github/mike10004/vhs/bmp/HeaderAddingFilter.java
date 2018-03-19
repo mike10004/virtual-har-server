@@ -6,7 +6,7 @@ import io.netty.handler.codec.http.HttpResponse;
 
 import java.util.function.Supplier;
 
-public class HeaderAddingFilter implements BmpResponseFilter {
+public class HeaderAddingFilter implements BmpResponseListener {
 
     private final Supplier<String> nameSupplier;
     private final Supplier<String> valueSupplier;
@@ -21,7 +21,11 @@ public class HeaderAddingFilter implements BmpResponseFilter {
     }
 
     @Override
-    public void filter(HttpResponse response) {
+    public void responding(RequestCapture requestCapture, ResponseCapture responseCapture) {
+        filter(responseCapture.response);
+    }
+
+    private void filter(HttpResponse response) {
         HttpHeaders headers = response.headers();
         String headerName = nameSupplier.get();
         String value = valueSupplier.get();

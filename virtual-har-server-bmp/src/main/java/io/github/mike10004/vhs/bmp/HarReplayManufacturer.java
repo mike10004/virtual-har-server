@@ -30,27 +30,24 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
     private final EntryMatcher entryMatcher;
     private final ImmutableList<ResponseInterceptor> responseInterceptors;
     private final HttpAssistant<RequestCapture, HttpResponse> bmpAssistant;
-    private final BmpResponseListener responseListener;
 
     /**
      * Constructs an instance.
      * @param entryMatcher the entry matcher
      * @param responseInterceptors a list of response interceptors
-     * @param responseListener a response listener
      */
-    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener) {
-        this(entryMatcher, responseInterceptors, responseListener, new BmpHttpAssistant());
+    public HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors) {
+        this(entryMatcher, responseInterceptors, new BmpHttpAssistant());
     }
 
-    protected HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, BmpResponseListener responseListener, HttpAssistant<RequestCapture, HttpResponse> bmpAssistant) {
+    protected HarReplayManufacturer(EntryMatcher entryMatcher, Iterable<ResponseInterceptor> responseInterceptors, HttpAssistant<RequestCapture, HttpResponse> bmpAssistant) {
         this.entryMatcher = requireNonNull(entryMatcher);
         this.responseInterceptors = ImmutableList.copyOf(responseInterceptors);
         this.bmpAssistant = requireNonNull(bmpAssistant);
-        this.responseListener = requireNonNull(responseListener);
     }
 
     @Override
-    public HttpResponse manufacture(RequestCapture capture) {
+    public ResponseCapture manufacture(RequestCapture capture) {
         return manufacture(bmpAssistant, capture);
     }
 
@@ -68,14 +65,15 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
                 .build();
     }
 
-    protected <Q, S> S manufacture(HttpAssistant<Q, S> assistant, Q incoming) {
+    protected <Q> ResponseCapture manufacture(HttpAssistant<Q, HttpResponse> assistant, Q incoming) {
         ParsedRequest request;
         try {
             request = assistant.parseRequest(incoming);
         } catch (IOException e) {
             log.error("failed to read from incoming request", e);
             ImmutableHttpResponse outgoing = createParsingFailedResponse();
-            return assistant.constructResponse(incoming, outgoing);
+            HttpResponse netty = assistant.constructResponse(incoming, outgoing);
+            return ResponseCapture.error(netty);
         }
         @Nullable HttpRespondable bestEntry = entryMatcher.findTopEntry(request);
         if (bestEntry != null) {
@@ -85,16 +83,14 @@ public class HarReplayManufacturer implements BmpResponseManufacturer {
         }
         if (bestEntry == null) {
             ImmutableHttpResponse response = createNotFoundResponse();
-            responseListener.respondingWithError(request, response.status);
-            return assistant.constructResponse(incoming, response);
+            return ResponseCapture.unmatched(assistant.constructResponse(incoming, response));
         } else {
             try {
-                return assistant.transformRespondable(incoming, bestEntry);
+                return ResponseCapture.matched(assistant.transformRespondable(incoming, bestEntry));
             } catch (IOException e) {
                 log.warn("failed to construct response", e);
                 ImmutableHttpResponse response = HttpAssistant.standardServerErrorResponse();
-                responseListener.respondingWithError(request, response.status);
-                return assistant.constructResponse(incoming, response);
+                return ResponseCapture.error(assistant.constructResponse(incoming, response));
             }
         }
     }

@@ -19,7 +19,7 @@ public class BrowsermobVhsConfig {
     public final BmpResponseManufacturer bmpResponseManufacturer;
     public final TlsEndpointFactory tlsEndpointFactory;
     public final CertificateAndKeySourceFactory certificateAndKeySourceFactory;
-    public final BmpResponseFilter proxyToClientResponseFilter;
+    public final BmpResponseListener bmpResponseListener;
 
     private BrowsermobVhsConfig(Builder builder) {
         port = builder.port;
@@ -27,7 +27,7 @@ public class BrowsermobVhsConfig {
         bmpResponseManufacturer = builder.bmpResponseManufacturer;
         tlsEndpointFactory = builder.tlsEndpointFactory;
         certificateAndKeySourceFactory = builder.certificateAndKeySourceFactory;
-        proxyToClientResponseFilter = builder.proxyToClientResponseFilter;
+        bmpResponseListener = builder.bmpResponseListener;
     }
 
     public static Builder builder(BmpResponseManufacturer bmanufacturer) {
@@ -62,7 +62,7 @@ public class BrowsermobVhsConfig {
         private final BmpResponseManufacturer bmpResponseManufacturer;
         private TlsEndpointFactory tlsEndpointFactory;
         private CertificateAndKeySourceFactory certificateAndKeySourceFactory;
-        private BmpResponseFilter proxyToClientResponseFilter = response -> {};
+        private BmpResponseListener bmpResponseListener = BmpResponseListener.inactive();
 
         private Builder(BmpResponseManufacturer bmpResponseManufacturer) {
             this.bmpResponseManufacturer = requireNonNull(bmpResponseManufacturer);
@@ -95,8 +95,8 @@ public class BrowsermobVhsConfig {
             return this;
         }
 
-        public Builder proxyToClientResponseFilter(BmpResponseFilter proxyToClientResponseFilter) {
-            this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
+        public Builder responseListener(BmpResponseListener bmpResponseListener) {
+            this.bmpResponseListener = requireNonNull(bmpResponseListener);
             return this;
         }
 

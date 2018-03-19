@@ -13,7 +13,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -55,7 +54,7 @@ public class ResponseManufacturingFilterTest {
         DefaultFullHttpRequest littleRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, url, content);
         String contentType = MediaType.PLAIN_TEXT_UTF_8.withCharset(bodyCharset).toString();
         littleRequest.headers().set(HttpHeaders.CONTENT_TYPE, contentType);
-        ResponseManufacturingFilter filter = new ResponseManufacturingFilter(littleRequest, createChannelHandlerContext(false), EasyMock.createMock(BmpResponseManufacturer.class), EasyMock.createMock(BmpResponseFilter.class));
+        ResponseManufacturingFilter filter = new ResponseManufacturingFilter(littleRequest, createChannelHandlerContext(false), EasyMock.createMock(BmpResponseManufacturer.class), EasyMock.createMock(BmpResponseListener.class));
         filter.captureRequest(littleRequest);
         RequestCapture bmpRequest = filter.freezeRequestCapture();
         ParsedRequest actual = bmpRequest.request;
@@ -141,7 +140,7 @@ public class ResponseManufacturingFilterTest {
             String fullUrl = testCase[0], hostHeader = testCase[1], expected = testCase[2];
             boolean https = "https".equalsIgnoreCase(URI.create(fullUrl).getScheme());
             HttpRequest mockRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "");
-            ResponseManufacturingFilter filter = new ResponseManufacturingFilter(mockRequest, createChannelHandlerContext(https), EasyMock.createMock(BmpResponseManufacturer.class), EasyMock.createMock(BmpResponseFilter.class));
+            ResponseManufacturingFilter filter = new ResponseManufacturingFilter(mockRequest, createChannelHandlerContext(https), EasyMock.createMock(BmpResponseManufacturer.class), EasyMock.createMock(BmpResponseListener.class));
             String actual = filter.reconstructUrlFromFullUrlAndHostHeader(fullUrl, hostHeader);
             String msg = String.format("%s reconstructed from %s and Host: %s", actual, fullUrl, hostHeader);
             if (!Objects.equals(expected, actual)) {
@@ -161,8 +160,8 @@ public class ResponseManufacturingFilterTest {
                 .build();
         BmpResponseManufacturer responseManufacturer = new BmpResponseManufacturer() {
             @Override
-            public HttpResponse manufacture(RequestCapture capture) {
-                return new BmpHttpAssistant().constructResponse(capture, alwaysResponse);
+            public ResponseCapture manufacture(RequestCapture capture) {
+                return ResponseCapture.matched(new BmpHttpAssistant().constructResponse(capture, alwaysResponse));
             }
         };
         BrowsermobVhsConfig vhsConfig = BrowsermobVhsConfig.builder(responseManufacturer)
@@ -172,11 +171,11 @@ public class ResponseManufacturingFilterTest {
         List<RequestCapture> requests = Collections.synchronizedList(new ArrayList<>());
         BrowsermobVirtualHarServer server = new BrowsermobVirtualHarServer(vhsConfig) {
             @Override
-            ResponseManufacturingFiltersSource createFirstFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseFilter proxyToClientResponseFilter, ResponseManufacturingFiltersSource.PassthruPredicate passthruPredicate) {
-                return new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, proxyToClientResponseFilter, passthruPredicate) {
+            ResponseManufacturingFiltersSource createFirstFiltersSource(BmpResponseManufacturer responseManufacturer, HostRewriter hostRewriter, BmpResponseListener bmpResponseListener, ResponseManufacturingFiltersSource.PassthruPredicate passthruPredicate) {
+                return new ResponseManufacturingFiltersSource(responseManufacturer, hostRewriter, bmpResponseListener, passthruPredicate) {
                     @Override
-                    ResponseManufacturingFilter createResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseFilter proxyToClientResponseFilter) {
-                        return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, proxyToClientResponseFilter) {
+                    ResponseManufacturingFilter createResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseListener bmpResponseListener) {
+                        return new ResponseManufacturingFilter(originalRequest, ctx, responseManufacturer, bmpResponseListener) {
                             @Override
                             RequestCapture freezeRequestCapture() {
                                 RequestCapture frozen = super.freezeRequestCapture();

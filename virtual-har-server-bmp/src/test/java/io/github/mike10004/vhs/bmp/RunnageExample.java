@@ -46,11 +46,11 @@ public class RunnageExample {
             EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
             EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
             EntryMatcher entryMatcher = new PrintingEntryMatcher(entryMatcherFactory.createEntryMatcher(entries, parser), System.out);
-            HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList(), (x, y) -> {});
+            HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList());
             AtomicLong counter = new AtomicLong(0);
             BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
                     .port(port)
-                    .proxyToClientResponseFilter(new HeaderAddingFilter("X-Filtered-Response-Count", () -> String.valueOf(counter.incrementAndGet())))
+                    .responseListener(new HeaderAddingFilter("X-Filtered-Response-Count", () -> String.valueOf(counter.incrementAndGet())))
                     .scratchDirProvider(ScratchDirProvider.under(scratchDir));
             BrowsermobVhsConfig config = configBuilder.build();
             VirtualHarServer server = new BrowsermobVirtualHarServer(config);

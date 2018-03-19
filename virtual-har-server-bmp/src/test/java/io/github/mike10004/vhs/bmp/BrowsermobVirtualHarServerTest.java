@@ -34,8 +34,6 @@ import io.github.mike10004.vhs.testsupport.Tests;
 import io.github.mike10004.vhs.testsupport.VirtualHarServerTestBase;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-
 import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -101,22 +99,22 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         }
         EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
-        HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList(), newLoggingResponseListener()) {
+        HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList()) {
             @Override
-            public HttpResponse manufacture(RequestCapture capture) {
+            public ResponseCapture manufacture(RequestCapture capture) {
                 requests.add(String.format("%s %s", capture.request.method, capture.request.url));
                 return super.manufacture(capture);
             }
         };
         Path scratchParent = temporaryFolder.getRoot().toPath();
-        BmpResponseFilter responseFilter = new HeaderAddingFilter(CUSTOM_HEADER_NAME, () -> {
+        BmpResponseListener responseFilter = new HeaderAddingFilter(CUSTOM_HEADER_NAME, () -> {
             String value = UUID.randomUUID().toString();
             customValues.add(value);
             return value;
         });
         BrowsermobVhsConfig.Builder configBuilder = BrowsermobVhsConfig.builder(responseManufacturer)
                     .port(port)
-                    .proxyToClientResponseFilter(responseFilter)
+                    .responseListener(responseFilter)
                     .scratchDirProvider(ScratchDirProvider.under(scratchParent));
         TlsMode tlsMode = context.get(KEY_TLS_MODE);
         if (tlsMode == TlsMode.SUPPORT_REQUIRED || tlsMode == TlsMode.PREDEFINED_CERT_SUPPORT) {
@@ -229,11 +227,16 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         public ErrorNoticeListener(Collection<ErrorResponseNotice> errorNotices) {
             this.errorNotices = errorNotices;
         }
+
         @Override
-        public void respondingWithError(ParsedRequest request, int status) {
-            System.out.format("responding %s to %s %s%n", status, request.method, request.url);
-            errorNotices.add(new ErrorResponseNotice(request, status));
+        public void responding(RequestCapture requestCapture, ResponseCapture responseCapture) {
+            int status = responseCapture.response.getStatus().code();
+            if (status >= 400) {
+                System.out.format("responding %s to %s %s%n", status, requestCapture.request.method, requestCapture.request.url);
+                errorNotices.add(new ErrorResponseNotice(requestCapture.request, status));
+            }
         }
+
     }
 
     @Test
@@ -246,12 +249,13 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         URI startUrl = URI.create("https://www.redi123.com/");
         URI finalUrl = new URIBuilder(startUrl).setPath("/other.html").build();
         ErrorNoticeListener errorResponseAccumulator = new ErrorNoticeListener();
-        HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList(), errorResponseAccumulator);
+        HarReplayManufacturer manufacturer = BmpTests.createManufacturer(harFile, Collections.emptyList());
         KeystoreData keystoreData = BmpTests.generateKeystoreForUnitTest("localhost");
         NanohttpdTlsEndpointFactory tlsEndpointFactory = NanohttpdTlsEndpointFactory.create(keystoreData, null);
         BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(manufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
                 .tlsEndpointFactory(tlsEndpointFactory)
+                .responseListener(errorResponseAccumulator)
                 .build();
         VirtualHarServer server = new BrowsermobVirtualHarServer(config);
         String finalPageSource = null;
@@ -287,8 +291,8 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
     private static BmpResponseListener newLoggingResponseListener() {
         return new BmpResponseListener() {
             @Override
-            public void respondingWithError(ParsedRequest request, int status) {
-                System.out.format("responding with status %s to %s %s", status, request.method, request.url);
+            public void responding(RequestCapture requestCapture, ResponseCapture responseCapture) {
+                System.out.format("responding with status %s to %s %s", responseCapture.response.getStatus(), requestCapture.request.method, requestCapture.request.url);
             }
         };
     }
@@ -366,9 +370,10 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         HarResponse response = BmpTests.buildHarResponse(200, responseHeaders, responseContent);
         HarEntry entry = BmpTests.buildHarEntry(request, response);
         List<HarEntry> entries = ImmutableList.of(entry);
-        BmpResponseManufacturer responseManufacturer = BmpTests.createManufacturer(entries, Collections.emptyList(), newLoggingResponseListener());
+        BmpResponseManufacturer responseManufacturer = BmpTests.createManufacturer(entries, Collections.emptyList());
         BrowsermobVhsConfig config = BrowsermobVhsConfig.builder(responseManufacturer)
                 .scratchDirProvider(ScratchDirProvider.under(temporaryFolder.getRoot().toPath()))
+                .responseListener(newLoggingResponseListener())
                 .build();
         VirtualHarServer server = new BrowsermobVirtualHarServer(config);
         Multimap<URI, byte[]> responses;

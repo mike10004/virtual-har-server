@@ -41,7 +41,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     private final transient AtomicBoolean unreachableExceptionThrown = new AtomicBoolean(false);
     private volatile boolean responseSent;
     private final RequestAccumulator requestAccumulator;
-    private final BmpResponseFilter proxyToClientResponseFilter;
+    private final BmpResponseListener responseListener;
 
     /**
      * The requestCaptureFilter captures all request content, including headers, trailing headers, and content. This filter
@@ -58,7 +58,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
      * @param ctx channel handler context
      * @throws IllegalArgumentException if request method is {@code CONNECT}
      */
-    public ResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseFilter proxyToClientResponseFilter) {
+    public ResponseManufacturingFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, BmpResponseManufacturer responseManufacturer, BmpResponseListener responseListener) {
         super(originalRequest, ctx);
         if (ProxyUtils.isCONNECT(originalRequest)) {
             throw new IllegalArgumentException("HTTP CONNECT requests not supported by these filters");
@@ -66,7 +66,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
         requestAccumulator = new RequestAccumulator(originalRequest.getProtocolVersion());
         requestCaptureFilter = new ClientRequestCaptureFilter(originalRequest);
         this.responseManufacturer = requireNonNull(responseManufacturer);
-        this.proxyToClientResponseFilter = requireNonNull(proxyToClientResponseFilter);
+        this.responseListener = requireNonNull(responseListener);
     }
 
     @Override
@@ -119,14 +119,13 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
     }
 
     protected HttpResponse produceResponse(RequestCapture bmpRequest) {
-        return responseManufacturer.manufacture(bmpRequest);
+        ResponseCapture responseCapture = responseManufacturer.manufacture(bmpRequest);
+        responseListener.responding(bmpRequest, responseCapture);
+        return responseCapture.response;
     }
 
     @Override
     public final HttpObject proxyToClientResponse(HttpObject httpObject) {
-        if (httpObject instanceof HttpResponse) {
-            proxyToClientResponseFilter.filter((HttpResponse)httpObject);
-        }
         return super.proxyToClientResponse(httpObject);
     }
 
