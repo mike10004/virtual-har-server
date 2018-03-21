@@ -27,9 +27,10 @@ class FrozenTypedContent implements TypedContent {
 
     @Override
     public String toString() {
+        String size = data.sizeIfKnown().toJavaUtil().map(Object::toString).orElse("?");
         return "ImmutableTypedContent{" +
                 "contentType=" + contentType +
-                ", data=" + data +
+                ", data.size=" + size +
                 '}';
     }
 }

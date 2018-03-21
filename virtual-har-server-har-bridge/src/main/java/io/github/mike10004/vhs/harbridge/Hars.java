@@ -1,9 +1,10 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Strings;
-import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
+import com.google.common.io.ByteStreams;
 import com.google.common.io.CharSource;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
@@ -13,10 +14,12 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Static utility methods relating to HAR data.
@@ -43,15 +46,15 @@ public class Hars {
      * Designed for arguments taken from a HAR content or post-data object.
      * @param contentType the content type (required)
      * @param text the text
-     * @param encoding the encoding field (of HAR content)
-     * @param size the size field
+     * @param harContentEncoding the encoding field (of HAR content)
+     * @param bodySize the size field
      * @return true if the text represents base-64-encoded data
      */
-    public static boolean isBase64Encoded(String contentType, String text, @Nullable String encoding, @Nullable Long size) {
-        if (!Encoding.isTextLike(contentType)) {
+    public static boolean isBase64Encoded(String contentType, String text, @Nullable String harContentEncoding, @Nullable Long bodySize) {
+        if ("base64".equalsIgnoreCase(harContentEncoding)) {
             return true;
         }
-        if ("base64".equalsIgnoreCase(encoding)) {
+        if (!ContentTypes.isTextLike(contentType)) {
             return true;
         }
         if (text.length() == 0) {
@@ -60,7 +63,7 @@ public class Hars {
         if (!isAllBase64Alphabet(text)) {
             return false;
         }
-        if (size != null) {
+        if (bodySize != null) {
             /*
              * There are cases where the text is not base64-encoded and the content length
              * in bytes is greater than the text length, because some text characters encode
@@ -68,7 +71,7 @@ public class Hars {
              * length, it's either an incorrectly-reported length value or malformed text, and
              * in either case we assume it's base64-encoding.
              */
-            if (text.length() > size) {
+            if (text.length() > bodySize) {
                 return true;
             }
         }
@@ -124,31 +127,65 @@ public class Hars {
 
     /**
      * Transforms a byte source such that the returned source decodes data as stipulated
-     * @param encoded byte source supplying (possibly) encoded data
+     * @param base64Data base-64-encoded data
      * @param contentEncodingHeaderValue value of HTTP content-encoding header in response
-     * @param bodySize bodySize field of HAR response object
-     * @param contentSize size field of HAR content object
-     * @return
+     * @param bodySize bodySize field of HAR response object (compressed size)
+     * @param contentSize size field of HAR content object (uncompressed size)
+     * @return a byte source supplying decoded data
      */
-    private static ByteSource decodingSource(ByteSource encoded, @Nullable String contentEncodingHeaderValue, @Nullable Long bodySize, @Nullable Long contentSize) {
-        // TODO handle the case where compressed data stored in the HAR content text field
-//        if (bodySize == null || contentSize == null) {
-//            log.info("at least one of [response bodySize, content size] = [{}, {}] is null; returning uncompressed data instead of trying to figure out compression", bodySize, contentSize);
-//            return unencodedReturnValue;
-//        }
-//        if (Objects.equals(bodySize, contentSize)) {
-//            log.debug("response body size equals response content size; assuming the data is not compressed (but this would be wrong if the compressed data is exactly the same size as the uncompressed)");
-//            return unencodedReturnValue;
-//        }
-//        if (contentSize.longValue() < bodySize.longValue()) {
-//            log.debug("contentSize {} < bodySize {}; this either violates HAR spec or compression added to byte count", contentSize, bodySize);
-//        }
-//        if (contentEncodingHeaderValue == null) {
-//            // if content-encoding header value is null, we'll assume gzip for now;
-//            // TODO try to determine compression type by sniffing data
-//            contentEncodingHeaderValue = HttpContentCodecs.CONTENT_ENCODING_GZIP;
-//        }
-        return encoded;
+    @VisibleForTesting
+    static ByteSource decodingSource(String base64Data, @Nullable String contentEncodingHeaderValue, @Nullable String harContentEncodingFieldValue, @Nullable Long bodySize, @Nullable Long contentSize) {
+        return decodingSource(base64Data, contentEncodingHeaderValue, harContentEncodingFieldValue, bodySize, contentSize, INACTIVE_CONSUMER);
+    }
+
+    private static final Consumer<Boolean> INACTIVE_CONSUMER = value -> {};
+
+    @VisibleForTesting
+    static ByteSource decodingSource(String base64Data, @Nullable String contentEncodingHeaderValue, @Nullable String harContentEncodingFieldValue, @Nullable Long bodySize, @Nullable Long contentSize, Consumer<? extends Boolean> readabilityTestResultConsumer) {
+        Base64ByteSource textAsByteSource = base64DecodingSource(base64Data);
+        if (contentEncodingHeaderValue != null) {
+            List<String> contentEncodings = HttpContentCodecs.parseEncodings(contentEncodingHeaderValue);
+            boolean anyNonIdentity = contentEncodings.stream().anyMatch(encoding -> !HttpContentCodecs.CONTENT_ENCODING_IDENTITY.equalsIgnoreCase(encoding));
+            if (anyNonIdentity) {
+                ByteSource decodingSource = wrap(textAsByteSource, contentEncodings);
+                if (isReadable(decodingSource, 16)) {
+                    return decodingSource;
+                }
+            }
+        }
+        return textAsByteSource;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    static boolean isReadable(@Nullable ByteSource byteSource, long testLength) {
+        if (byteSource != null) {
+            try {
+                try (InputStream in = byteSource.slice(0, testLength).openStream()) {
+                    ByteStreams.exhaust(in);
+                }
+                return true;
+            } catch (IOException e) {
+                log.debug("byte source not readable due to {}", e.toString());
+            }
+        }
+        return false;
+    }
+
+    static Base64ByteSource base64DecodingSource(String base64Data) {
+        return Base64ByteSource.wrap(base64Data);
+    }
+
+    @Nullable
+    static ByteSource wrap(ByteSource original, List<String> contentEncodings) {
+        for (String contentEncoding : contentEncodings) {
+            @Nullable HttpContentCodec codec = HttpContentCodecs.getCodec(contentEncoding);
+            if (codec == null) {
+                log.info("unsupported codec: {}", contentEncoding);
+                return null;
+            }
+            original = codec.decompressingSource(original);
+        }
+        return original;
     }
 
     /**
@@ -179,7 +216,7 @@ public class Hars {
      * @param contentEncodingHeaderValue value of the Content-Encoding header
      * @param harContentEncoding value of the HAR content "encoding" field
      * @param comment HAR content comment
-     * @param direction direction of communication (request or response); this affects
+     * @param charset default charset to use in decoding bytes
      * @return a byte source that supplies a stream of the response body as unencoded, uncompressed bytes
      */
     static TypedContent getUncompressedContent(@Nullable String contentType,
@@ -190,9 +227,6 @@ public class Hars {
                                                @Nullable String harContentEncoding,
                                                @SuppressWarnings("unused") @Nullable String comment,
                                                Charset defaultCharset) {
-        if (text == null) {
-            return TypedContent.identity(ByteSource.empty(), contentType);
-        }
         if (contentType == null) {
             contentType = MediaType.OCTET_STREAM.toString();
         }
@@ -203,10 +237,12 @@ public class Hars {
             log.info("failed to parse content-type {}", contentType);
             mediaType = MediaType.OCTET_STREAM;
         }
+        if (text == null) {
+            return TypedContent.identity(ByteSource.empty(), mediaType);
+        }
         boolean base64 = isBase64Encoded(contentType, text, harContentEncoding, bodySize);
         if (base64) {
-            ByteSource textAsByteSource = BaseEncoding.base64().decodingSource(CharSource.wrap(text));
-            ByteSource decodedDataSource = decodingSource(textAsByteSource, contentEncodingHeaderValue, bodySize, contentSize);
+            ByteSource decodedDataSource = decodingSource(text, contentEncodingHeaderValue, harContentEncoding, bodySize, contentSize);
             return TypedContent.identity(decodedDataSource, mediaType);
         } else {
             Charset charset = defaultCharset;

@@ -60,10 +60,6 @@ public class HttpContentCodecs {
                 .stream().map(String::toLowerCase).collect(ImmutableList.toImmutableList());
     }
 
-    static ImmutableList<String> parseContentEncodings(@Nullable String contentEncodingHeaderValue) {
-        return parseEncodings(contentEncodingHeaderValue);
-    }
-
     static class GzipCompressor implements HttpContentCodec {
 
         @Override

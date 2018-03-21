@@ -66,7 +66,7 @@ public class WrappingResponseEncodingTest {
     }
 
     private void test_canServeOriginalResponseContentEncoding(boolean expected, String contentEncoding, String acceptEncoding) {
-        List<String> contentEncodings = HttpContentCodecs.parseContentEncodings(contentEncoding);
+        List<String> contentEncodings = HttpContentCodecs.parseEncodings(contentEncoding);
         boolean actual = WrappingResponseEncoding.canServeOriginalResponseContentEncoding(contentEncodings, acceptEncoding);
         assertEquals(String.format("expect %s for Content-Encoding: %s with Accept-Encoding: %s", expected, contentEncoding, acceptEncoding), expected, actual);
     }

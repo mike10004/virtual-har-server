@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 
 import java.io.ByteArrayInputStream;
@@ -7,6 +8,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Interface of an HTTP content codec. A codec is an encoder/decoder that modifies
@@ -37,9 +40,34 @@ public interface HttpContentCodec {
         return IdentityCodec.INSTANCE;
     }
 
+    default ByteSource decompressingSource(ByteSource byteSource) {
+        return new DecompressingByteSource(this, byteSource);
+    }
+
+    class DecompressingByteSource extends ByteSource {
+
+        private HttpContentCodec codec;
+        private ByteSource compressedDataSource;
+
+        public DecompressingByteSource(HttpContentCodec codec, ByteSource compressedDataSource) {
+            this.codec = requireNonNull(codec);
+            this.compressedDataSource = requireNonNull(compressedDataSource);
+        }
+
+        @Override
+        public InputStream openStream() throws IOException {
+            return codec.openDecompressingStream(compressedDataSource.openStream());
+        }
+
+        @Override
+        public String toString() {
+            return "DecompressingByteSource{" + codec + "}";
+        }
+    }
+
     class IdentityCodec implements HttpContentCodec {
 
-        protected IdentityCodec() {}
+        private IdentityCodec() {}
 
         private static final IdentityCodec INSTANCE = new IdentityCodec();
 
@@ -61,6 +89,11 @@ public interface HttpContentCodec {
         @Override
         public InputStream openDecompressingStream(InputStream source)  {
             return source;
+        }
+
+        @Override
+        public String toString() {
+            return "IdentityCodec{SINGLETON}";
         }
     }
 }

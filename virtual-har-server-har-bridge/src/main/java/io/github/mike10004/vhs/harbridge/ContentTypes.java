@@ -6,13 +6,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.nio.charset.Charset;
 
-class Encoding {
+class ContentTypes {
 
-    private static final Logger log = LoggerFactory.getLogger(Encoding.class);
+    private static final Logger log = LoggerFactory.getLogger(ContentTypes.class);
 
-    private Encoding() {}
+    private ContentTypes() {}
 
     public static boolean isTextLike(@Nullable String contentType) {
         if (contentType == null) {
