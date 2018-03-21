@@ -7,6 +7,7 @@ import com.google.common.net.HostAndPort;
 import com.google.common.net.HttpHeaders;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarResponseData;
+import io.github.mike10004.vhs.harbridge.HarResponseEncoding;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 
@@ -31,11 +32,18 @@ import static java.util.Objects.requireNonNull;
 public class HarBridgeEntryParser<E> implements EntryParser<E> {
 
     private final HarBridge<E> bridge;
+    private final HarResponseEncoderFactory<E> responseEncoderFactory;
 
-    public HarBridgeEntryParser(HarBridge<E> bridge) {
+    public HarBridgeEntryParser(HarBridge<E> bridge, HarResponseEncoderFactory<E> responseEncoderFactory) {
         this.bridge = requireNonNull(bridge);
+        this.responseEncoderFactory = requireNonNull(responseEncoderFactory);
     }
 
+    public static <E> HarBridgeEntryParser<E> withPlainEncoder(HarBridge<E> bridge) {
+        return new HarBridgeEntryParser<>(bridge, HarResponseEncoderFactory.alwaysIdentityEncoding());
+    }
+
+    @SuppressWarnings("SameParameterValue")
     protected static int getDefaultPortForScheme(@Nullable String scheme, int defaultDefault) {
         if (scheme != null) {
             switch (scheme) {
@@ -81,10 +89,7 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
         Multimap<String, Optional<String>> query = parseQuery(parsedUrl);
         Multimap<String, String> indexedHeaders = indexHeaders(bridge.getRequestHeaders(harEntry));
         ByteSource bodySource = bridge.getRequestPostData(harEntry);
-        byte[] body = null;
-        if (bodySource != null) {
-            body = bodySource.read();
-        }
+        byte[] body = bodySource.read();
         return ParsedRequest.inMemory(method, parsedUrl, query, indexedHeaders, body);
     }
 
@@ -110,7 +115,8 @@ public class HarBridgeEntryParser<E> implements EntryParser<E> {
     @Override
     public HttpRespondable parseResponse(ParsedRequest request, E entry) throws IOException {
         int status = bridge.getResponseStatus(entry);
-        HarResponseData responseData = bridge.getResponseData(request, entry);
+        HarResponseEncoding responseEncoder = responseEncoderFactory.getEncoder(request, entry);
+        HarResponseData responseData = bridge.getResponseData(request, entry, responseEncoder);
         return constructRespondable(status, responseData);
     }
 

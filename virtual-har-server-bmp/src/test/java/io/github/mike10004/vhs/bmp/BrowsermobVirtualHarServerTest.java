@@ -97,7 +97,7 @@ public class BrowsermobVirtualHarServerTest extends VirtualHarServerTestBase {
         } catch (HarReaderException e) {
             throw new IOException(e);
         }
-        EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
+        EntryParser<HarEntry> parser = HarBridgeEntryParser.withPlainEncoder(new SstoehrHarBridge());
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
         HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList()) {
             @Override

@@ -44,7 +44,7 @@ public class RunnageExample {
                 System.out.format("  %s %s%n", request.getMethod(), request.getUrl());
             });
             EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
-            EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
+            EntryParser<HarEntry> parser = HarBridgeEntryParser.withPlainEncoder(new SstoehrHarBridge());
             EntryMatcher entryMatcher = new PrintingEntryMatcher(entryMatcherFactory.createEntryMatcher(entries, parser), System.out);
             HarReplayManufacturer responseManufacturer = new HarReplayManufacturer(entryMatcher, Collections.emptyList());
             AtomicLong counter = new AtomicLong(0);

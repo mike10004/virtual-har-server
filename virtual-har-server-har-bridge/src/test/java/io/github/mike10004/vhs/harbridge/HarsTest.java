@@ -1,35 +1,25 @@
 package io.github.mike10004.vhs.harbridge;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.ImmutableTable;
+import com.google.common.collect.Table;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
-import com.google.common.io.ByteStreams;
 import com.google.common.io.Resources;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.mike10004.vhs.harbridge.Hars.ResponseContentTranslation;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.junit.Test;
 
-import javax.annotation.Nullable;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.AbstractMap;
-import java.util.List;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
 
+import static java.nio.charset.StandardCharsets.ISO_8859_1;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 public class HarsTest {
 
@@ -71,114 +61,58 @@ public class HarsTest {
 
     @Test
     public void testGzippedHtml() throws Exception {
-        String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
+        String json = Resources.toString(getClass().getResource("/gzipped-response.json"), UTF_8);
         JsonObject response = new JsonParser().parse(json).getAsJsonObject();
         JsonObject content = response.getAsJsonObject("content");
-        String contentEncodingHeaderValue = getFirstHeaderValueFromNameValuePairs(response.getAsJsonArray("headers"), HttpHeaders.CONTENT_ENCODING);
+        String contentEncodingHeaderValue = HarBridgeTests.getFirstHeaderValueFromNameValuePairs(response.getAsJsonArray("headers"), HttpHeaders.CONTENT_ENCODING);
         String text = content.get("text").getAsString();
-        ParsedRequest request = buildRequest(HttpContentCodecs.CONTENT_ENCODING_GZIP);
-        byte[] data = Hars.translateResponseContent(request, content.get("mimeType").getAsString(),
+        byte[] data = Hars.translateResponseContent(content.get("mimeType").getAsString(),
                 text,
                 response.get("bodySize").getAsLong(),
                 content.get("size").getAsLong(),
                 contentEncodingHeaderValue,
-                null, null).getBodyOrNull().read();
-        byte[] decompressed = gunzip(data);
-        String decompressedText = new String(decompressed, StandardCharsets.UTF_8);
+                null, null).asByteSource().read();
+        String decompressedText = new String(data, UTF_8);
         assertEquals("text", text, decompressedText);
-    }
-
-    private static ParsedRequest buildRequest(@Nullable String acceptEncodingHeaderValue) {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        if (acceptEncodingHeaderValue != null) {
-            headers.put(HttpHeaders.ACCEPT_ENCODING, acceptEncodingHeaderValue);
-        }
-        return ParsedRequest.inMemory(HttpMethod.GET, URI.create("http://www.example.com/"), ImmutableMultimap.of(), headers, null);
-    }
-
-    private static byte[] gunzip(byte[] compressed) throws IOException {
-        try (GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(compressed), compressed.length * 2)) {
-            return ByteStreams.toByteArray(gzin);
-        }
-    }
-
-    @Nullable
-    private static String getFirstHeaderValueFromNameValuePairs(JsonArray arrayOfNameValuePairs, String headerName) {
-        return ImmutableList.copyOf(arrayOfNameValuePairs).stream()
-                .map(JsonElement::getAsJsonObject)
-                .filter(el -> headerName.equalsIgnoreCase(el.get("name").getAsString()))
-                .map(el -> el.get("value").getAsString())
-                .findFirst().orElse(null);
-    }
-
-    private void test_canServeOriginalResponseContentEncoding(boolean expected, String contentEncoding, String acceptEncoding) {
-        List<String> contentEncodings = Hars.parseContentEncodings(contentEncoding);
-        boolean actual = Hars.canServeOriginalResponseContentEncoding(contentEncodings, acceptEncoding);
-        assertEquals(String.format("expect %s for Content-Encoding: %s with Accept-Encoding: %s", expected, contentEncoding, acceptEncoding), expected, actual);
-    }
-
-    @Test
-    public void canServeOriginalResponseContentEncoding() {
-        test_canServeOriginalResponseContentEncoding(true, "gzip", "gzip");
-        test_canServeOriginalResponseContentEncoding(true, "gzip", "deflate, gzip;q=1.0, *;q=0.5");
-        test_canServeOriginalResponseContentEncoding(true, "gzip", "gzip, deflate, br");
-        test_canServeOriginalResponseContentEncoding(true, "gzip, br", "gzip, deflate, br");
-        test_canServeOriginalResponseContentEncoding(false, "gzip", null);
-        test_canServeOriginalResponseContentEncoding(false, "gzip", "");
-        test_canServeOriginalResponseContentEncoding(false, "gzip", "deflate;q=1.0, gzip;q=0.0, *;q=0.5");
-        test_canServeOriginalResponseContentEncoding(true, null, null);
-        test_canServeOriginalResponseContentEncoding(true, null, "");
-        test_canServeOriginalResponseContentEncoding(true, "", null);
-        test_canServeOriginalResponseContentEncoding(true, "", "");
-        test_canServeOriginalResponseContentEncoding(true, "identity", null);
-        test_canServeOriginalResponseContentEncoding(true, null, "gzip, deflate, br");
-        test_canServeOriginalResponseContentEncoding(true, "", "gzip, deflate, br");
-        test_canServeOriginalResponseContentEncoding(true, "identity", "gzip, deflate, br");
-    }
-
-    @Test
-    public void testResponseEncodedButAcceptEncodingDisallows() throws Exception {
-        String json = Resources.toString(getClass().getResource("/gzipped-response.json"), StandardCharsets.UTF_8);
-        JsonObject response = new JsonParser().parse(json).getAsJsonObject();
-        JsonObject content = response.getAsJsonObject("content");
-        String contentEncodingHeaderValue = getFirstHeaderValueFromNameValuePairs(response.getAsJsonArray("headers"), HttpHeaders.CONTENT_ENCODING);
-        String text = content.get("text").getAsString();
-        ParsedRequest request = buildRequest(null);
-        ResponseContentTranslation result = Hars.translateResponseContent(request, content.get("mimeType").getAsString(),
-                text,
-                response.get("bodySize").getAsLong(),
-                content.get("size").getAsLong(),
-                contentEncodingHeaderValue,
-                null, null);
-        String responseText = result.getBodyOrNull().asCharSource(StandardCharsets.UTF_8).read();
-        assertEquals("text", text, responseText);
-
-    }
-
-    @Test
-    public void modifyContentEncodingHeaderInBrotliEncodedResponse() throws Exception {
-        ParsedRequest request = buildRequest("br");
-        String text = "hello, world";
-        ResponseContentTranslation translation = Hars.translateResponseContent(request, "text/plain", text, (long) text.length(), (long) text.length(), HttpContentCodecs.CONTENT_ENCODING_BROTLI, null, null);
-        String actual = translation.getBodyOrNull().asCharSource(StandardCharsets.US_ASCII).read();
-        assertEquals("decoded", text, actual);
-        Map.Entry<String, String> originalHeader = new AbstractMap.SimpleImmutableEntry<>(HttpHeaders.CONTENT_ENCODING, HttpContentCodecs.CONTENT_ENCODING_BROTLI);
-        Map.Entry<String, String> modifiedHeader = translation.headerMap.apply(originalHeader);
-        assertEquals("name", originalHeader.getKey(), modifiedHeader.getKey());
-        assertEquals("value", HttpContentCodecs.CONTENT_ENCODING_IDENTITY, modifiedHeader.getValue());
     }
 
     @Test
     public void getUncompressedContent() throws Exception {
-        String HEX_BYTES = "E29C93";
+        String HEX_BYTES = "E29C93"; // unicode check mark (not in ASCII or ISO-8859-1 charsets)
         byte[] bytes = BaseEncoding.base16().decode(HEX_BYTES);
-        String text = new String(bytes, StandardCharsets.UTF_8);
+        String text = new String(bytes, UTF_8);
         System.out.format("text: %s%n", text);
         MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withoutParameters();
-        ResponseContentTranslation translation = Hars.getUncompressedContent(contentType.toString(), text, null, null, null, Hars.MessageDirection.RESPONSE);
-        ByteSource data = translation.getBodyOrNull();
-        assertNotNull("data", data);
+        TypedContent translation = Hars.getUncompressedContent(contentType.toString(), text, null, null, null, null, null, StandardCharsets.ISO_8859_1);
+        ByteSource data = translation.asByteSource();
         String hexActual = BaseEncoding.base16().encode(data.read());
         assertEquals("result", HEX_BYTES, hexActual);
+    }
+
+    @Test
+    public void detectCharset() throws Exception {
+        Table<String, Charset, Charset> testCases = ImmutableTable.<String, Charset, Charset>builder()
+                .put("", US_ASCII, US_ASCII)
+                .put("abcdef", US_ASCII, US_ASCII)
+                .put("Fractions: " + decodeFromHex("BCBDBE", ISO_8859_1), US_ASCII, UTF_8)
+                .put("abcdef", ISO_8859_1, ISO_8859_1)
+                .put("abcdef", UTF_8, UTF_8)
+                .put("abc \uD83C\uDCA1\uD83C\uDCA8\ud83c\udcd1\ud83c\udcd8\ud83c\udcd3", ISO_8859_1, UTF_8)
+                .build();
+        testCases.cellSet().forEach(cell -> {
+            String text = cell.getRowKey();
+            Charset charset = cell.getColumnKey();
+            Charset expected = cell.getValue();
+            Charset actual = Hars.detectCharset(text, charset);
+            String description = String.format("\"%s\" with suggestion %s", StringEscapeUtils.escapeJava(text), charset);
+            System.out.format("%s -> %s (expecting %s)%n", description, actual, expected);
+            assertEquals(description, expected, actual);
+        });
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private static String decodeFromHex(String hexEncodedBytes, Charset charset) {
+        byte[] bytes = BaseEncoding.base16().decode(hexEncodedBytes.toUpperCase());
+        return new String(bytes, charset);
     }
 }

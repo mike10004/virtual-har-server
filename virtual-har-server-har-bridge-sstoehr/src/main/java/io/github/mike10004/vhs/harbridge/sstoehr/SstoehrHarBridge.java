@@ -2,6 +2,7 @@ package io.github.mike10004.vhs.harbridge.sstoehr;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
@@ -15,8 +16,12 @@ import de.sstoehr.harreader.model.HarResponse;
 import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarResponseData;
+import io.github.mike10004.vhs.harbridge.HarResponseDataTransformer;
+import io.github.mike10004.vhs.harbridge.HarResponseEncoding;
 import io.github.mike10004.vhs.harbridge.Hars;
+import io.github.mike10004.vhs.harbridge.HttpContentCodecs;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
+import io.github.mike10004.vhs.harbridge.TypedContent;
 import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +32,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.function.Supplier;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -113,41 +117,36 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
     }
 
     @Override
-    public HarResponseData getResponseData(ParsedRequest request, HarEntry entry) throws IOException {
-        Hars.ResponseContentTranslation contentTranslation = getResponseBody(request, entry);
-        Supplier<Stream<Map.Entry<String, String>>> headers = () -> {
-            Supplier<Stream<Map.Entry<String, String>>> originalHeaders = getResponseHeaders(entry);
-            if (originalHeaders != null) {
-                return originalHeaders.get().map(contentTranslation.headerMap);
-            } else {
-                return Stream.empty();
-            }
-        };
-        return HarResponseData.of(headers, getResponseContentType(entry), contentTranslation.getBodyOrNull());
+    public HarResponseData getResponseData(ParsedRequest request, HarEntry entry, HarResponseEncoding encoding) throws IOException {
+        TypedContent contentPackage = getResponseBody(entry);
+        List<Map.Entry<String, String>> headers = getResponseHeaders(entry);
+        HarResponseData underlying = HarResponseData.of(headers, contentPackage.getContentType(), contentPackage.asByteSource());
+        underlying = HarResponseData.transform()
+                .replaceContentType(contentPackage.getContentType())
+                .replaceHeader(HttpHeaders.CONTENT_ENCODING, HttpContentCodecs.CONTENT_ENCODING_IDENTITY)
+                .transform(underlying);
+        return encoding.transformUnencoded(underlying);
     }
 
-    @Nullable
-    private Supplier<Stream<Entry<String, String>>> getResponseHeaders(HarEntry entry) {
+    private ImmutableList<Map.Entry<String, String>> getResponseHeaders(HarEntry entry) {
         HarResponse harResponse = entry.getResponse();
         if (harResponse != null) {
-            return () -> {
-                List<HarHeader> headers = harResponse.getHeaders();
-                if (headers != null) {
-                    return headers.stream()
-                            .map(header -> new SimpleImmutableEntry<>(header.getName(), header.getValue()));
-                } else {
-                    return Stream.empty();
-                }
-            };
-        } else {
-            return null;
+            List<HarHeader> headers = harResponse.getHeaders();
+            if (headers != null) {
+                return headers.stream()
+                        .filter(Objects::nonNull)
+                        .filter(header -> header.getName() != null)
+                        .map(header -> new SimpleImmutableEntry<>(header.getName(), Strings.nullToEmpty(header.getValue())))
+                        .collect(ImmutableList.toImmutableList());
+            }
         }
+        return ImmutableList.of();
     }
 
-    private Hars.ResponseContentTranslation getResponseBody(ParsedRequest request, HarEntry entry) throws IOException {
+    private TypedContent getResponseBody(HarEntry entry) throws IOException {
         HarResponse rsp = entry.getResponse();
         if (rsp == null) {
-            return Hars.ResponseContentTranslation.identity(ByteSource.empty());
+            return TypedContent.identity(ByteSource.empty(), MediaType.OCTET_STREAM);
         }
         HarContent content = requireNonNull(rsp.getContent(), "response.content");
         @Nullable Long harContentSize = nullIfNegative(content.getSize());
@@ -161,22 +160,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         @Nullable String contentType = content.getMimeType();
         @Nullable String comment = content.getComment();
         @Nullable String text = content.getText();
-        return Hars.translateResponseContent(request, contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment);
-    }
-
-    @Nullable
-    private MediaType getResponseContentType(HarEntry entry) {
-        HarResponse rsp = entry.getResponse();
-        if (rsp != null) {
-            HarContent content = rsp.getContent();
-            if (content != null) {
-                String contentType = content.getMimeType();
-                if (!Strings.nullToEmpty(contentType).trim().isEmpty()) {
-                    return MediaType.parse(contentType);
-                }
-            }
-        }
-        return null;
+        return Hars.translateResponseContent(contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment);
     }
 
     @Override

@@ -89,7 +89,7 @@ public class BmpTests {
             System.out.format("  %s %s%n", request.getMethod(), request.getUrl());
         });
         EntryMatcherFactory entryMatcherFactory = HeuristicEntryMatcher.factory(new BasicHeuristic(), BasicHeuristic.DEFAULT_THRESHOLD_EXCLUSIVE);
-        EntryParser<HarEntry> parser = new HarBridgeEntryParser<>(new SstoehrHarBridge());
+        EntryParser<HarEntry> parser = HarBridgeEntryParser.withPlainEncoder(new SstoehrHarBridge());
         EntryMatcher entryMatcher = entryMatcherFactory.createEntryMatcher(entries, parser);
         return new HarReplayManufacturer(entryMatcher, responseInterceptors);
     }

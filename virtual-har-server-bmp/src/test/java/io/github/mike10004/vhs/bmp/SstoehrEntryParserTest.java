@@ -12,7 +12,7 @@ public class SstoehrEntryParserTest extends EntryParserTestBase<HarEntry> {
 
     @Override
     protected EntryParser<HarEntry> createParser() {
-        return new HarBridgeEntryParser<>(new SstoehrHarBridge());
+        return HarBridgeEntryParser.withPlainEncoder(new SstoehrHarBridge());
     }
 
     @SuppressWarnings("Duplicates")

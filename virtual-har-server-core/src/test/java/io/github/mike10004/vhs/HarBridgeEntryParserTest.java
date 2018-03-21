@@ -1,6 +1,7 @@
 package io.github.mike10004.vhs;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
@@ -10,6 +11,7 @@ import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarResponseData;
+import io.github.mike10004.vhs.harbridge.HarResponseEncoding;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import org.junit.Assume;
@@ -23,6 +25,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
@@ -49,7 +52,7 @@ public class HarBridgeEntryParserTest {
         long originalContentLengthValue = bytes.length * 2;
         MediaType contentType = MediaType.PLAIN_TEXT_UTF_8.withCharset(charset);
         Map<String, String> originalHeaders = ImmutableMap.of(HttpHeaders.CONTENT_TYPE, contentType.toString(), HttpHeaders.CONTENT_LENGTH, String.valueOf(originalContentLengthValue));
-        HttpRespondable respondable = HarBridgeEntryParser.constructRespondable(200, HarResponseData.of(originalHeaders.entrySet()::stream, contentType, ByteSource.wrap(bytes)));
+        HttpRespondable respondable = HarBridgeEntryParser.constructRespondable(200, HarResponseData.of(originalHeaders.entrySet(), contentType, ByteSource.wrap(bytes)));
         Multimap<String, String> headersMm = ArrayListMultimap.create();
         respondable.streamHeaders().forEach(h -> {
             headersMm.put(h.getKey(), h.getValue());
@@ -91,7 +94,7 @@ public class HarBridgeEntryParserTest {
 
     @Test
     public void parseGetRequest() throws IOException {
-        HarBridgeEntryParser<FakeHarEntry> parser = new HarBridgeEntryParser<>(new FakeHarBridge());
+        HarBridgeEntryParser<FakeHarEntry> parser = HarBridgeEntryParser.withPlainEncoder(new FakeHarBridge());
         URI url = URI.create("http://www.example.com/");
         FakeHarEntry something = FakeHarEntry.request("GET", url.toString());
         ParsedRequest request = parser.parseRequest(something);
@@ -101,7 +104,7 @@ public class HarBridgeEntryParserTest {
 
     @Test
     public void parseConnectRequest() throws Exception {
-        HarBridgeEntryParser<FakeHarEntry> parser = new HarBridgeEntryParser<>(new FakeHarBridge());
+        HarBridgeEntryParser<FakeHarEntry> parser = HarBridgeEntryParser.withPlainEncoder(new FakeHarBridge());
         URI url = new URI(null, null, "www.example.com", 443, null, null, null);
         FakeHarEntry something = FakeHarEntry.request("CONNECT", "www.example.com:443");
         ParsedRequest request = parser.parseRequest(something);
@@ -125,8 +128,8 @@ public class HarBridgeEntryParserTest {
         }
 
         @Override
-        public Stream<Entry<String, String>> getRequestHeaders(FakeHarEntry entry) {
-            return entry.getRequestHeaders();
+        public Stream<Map.Entry<String, String>> getRequestHeaders(FakeHarEntry entry) {
+            return entry.getRequestHeaders().stream();
         }
 
         @Nullable
@@ -141,8 +144,8 @@ public class HarBridgeEntryParserTest {
         }
 
         @Override
-        public HarResponseData getResponseData(ParsedRequest request, FakeHarEntry entry) throws IOException {
-            return HarResponseData.of(entry::getResponseHeaders, entry.responseContentType, ByteSource.wrap(entry.getResponseBody() == null ? new byte[0] : entry.getResponseBody()));
+        public HarResponseData getResponseData(ParsedRequest request, FakeHarEntry entry, HarResponseEncoding encoder) throws IOException {
+            return HarResponseData.of(entry.getResponseHeaders(), entry.responseContentType, ByteSource.wrap(entry.getResponseBody() == null ? new byte[0] : entry.getResponseBody()));
         }
     }
     
@@ -150,10 +153,10 @@ public class HarBridgeEntryParserTest {
     private static class FakeHarEntry {
 
         private final String requestMethod, requestUrl;
-        private final Collection<Map.Entry<String, String>> requestHeaders;
+        private final List<Map.Entry<String, String>> requestHeaders;
         private final ByteSource requestPostData;
         private final int responseStatus;
-        private final Collection<Map.Entry<String, String>> responseHeaders;
+        private final List<Map.Entry<String, String>> responseHeaders;
         private final byte[] responseBody;
         private final MediaType responseContentType;
 
@@ -168,10 +171,10 @@ public class HarBridgeEntryParserTest {
         public FakeHarEntry(String requestMethod, String requestUrl, Collection<Entry<String, String>> requestHeaders, ByteSource requestPostData, int responseStatus, Collection<Entry<String, String>> responseHeaders, byte[] responseBody, MediaType responseContentType) {
             this.requestMethod = requestMethod;
             this.requestUrl = requestUrl;
-            this.requestHeaders = requestHeaders;
-            this.requestPostData = requestPostData;
+            this.requestHeaders = requestHeaders == null ? ImmutableList.of() : ImmutableList.copyOf(requestHeaders);
+            this.requestPostData = requestPostData == null ? ByteSource.empty() : requestPostData;
             this.responseStatus = responseStatus;
-            this.responseHeaders = responseHeaders;
+            this.responseHeaders = responseHeaders == null ? ImmutableList.of() : ImmutableList.copyOf(responseHeaders);
             this.responseBody = responseBody;
             this.responseContentType = responseContentType;
         }
@@ -186,13 +189,13 @@ public class HarBridgeEntryParserTest {
         }
 
         
-        public Stream<Entry<String, String>> getRequestHeaders() {
-            return requestHeaders.stream();
+        public List<Map.Entry<String, String>> getRequestHeaders() {
+            return requestHeaders;
         }
 
         
-        public Stream<Entry<String, String>> getResponseHeaders() {
-            return responseHeaders.stream();
+        public List<Map.Entry<String, String>> getResponseHeaders() {
+            return responseHeaders;
         }
 
         public ByteSource getRequestPostData() throws IOException {
@@ -220,7 +223,7 @@ public class HarBridgeEntryParserTest {
         String host = "example.com";
         int port = 6789;
         String url = HostAndPort.fromParts(host, port).toString();
-        URI actual =  new HarBridgeEntryParser<>(new FakeHarBridge()).parseUrl(HttpMethod.CONNECT, url);
+        URI actual =  HarBridgeEntryParser.withPlainEncoder(new FakeHarBridge()).parseUrl(HttpMethod.CONNECT, url);
         assertEquals("parse results", parsedConnectUri(host, port), actual);
     }
 
@@ -232,7 +235,7 @@ public class HarBridgeEntryParserTest {
     public void parseUrl_strangeConnectUrl() throws Exception {
         String host = "abc.def.ghijklm.com";
         String url = "https://" + host;
-        URI actual = new HarBridgeEntryParser<>(new FakeHarBridge()).parseUrl(HttpMethod.CONNECT, url);
+        URI actual = HarBridgeEntryParser.withPlainEncoder(new FakeHarBridge()).parseUrl(HttpMethod.CONNECT, url);
         URI expected = parsedConnectUri(host, 443);
         assertEquals("parse result", expected, actual);
     }

@@ -49,7 +49,6 @@ public interface HarBridge<E> {
      */
     Stream<Map.Entry<String, String>> getRequestHeaders(E entry);
 
-    @Nullable
     ByteSource getRequestPostData(E entry) throws IOException;
 
     /**
@@ -66,9 +65,10 @@ public interface HarBridge<E> {
      * Gets an object representing the HAR response data.
      * @param request the request
      * @param entry the HAR entry
+     * @param encodingStrategy encoding strategy
      * @return the response data
      * @throws IOException on I/O error
      */
-    HarResponseData getResponseData(ParsedRequest request, E entry) throws IOException;
+    HarResponseData getResponseData(ParsedRequest request, E entry, HarResponseEncoding encodingStrategy) throws IOException;
 
 }

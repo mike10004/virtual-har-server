@@ -44,7 +44,7 @@ public class RealHarFileParsingTest {
         File harFile = new File(harFilePathname);
         Assume.assumeTrue(String.format("skipping because not a file: %s", harFile), harFile.isFile());
         HarBridge<HarEntry> bridge = new SstoehrHarBridge();
-        HarBridgeEntryParser<HarEntry> entryParser = new HarBridgeEntryParser<>(bridge);
+        HarBridgeEntryParser<HarEntry> entryParser = HarBridgeEntryParser.withPlainEncoder(bridge);
         Har har = new HarReader().readFromFile(harFile, HarReaderMode.LAX);
         for (HarEntry entry : har.getLog().getEntries()) {
             try {
@@ -153,7 +153,7 @@ public class RealHarFileParsingTest {
         HarEntry harEntry = new HarEntry();
         HarRequest request = new Gson().fromJson(json, HarRequest.class);
         harEntry.setRequest(request);
-        new HarBridgeEntryParser<>(new SstoehrHarBridge()).parseRequest(harEntry);
+        HarBridgeEntryParser.withPlainEncoder(new SstoehrHarBridge()).parseRequest(harEntry);
     }
 
     @Test
@@ -204,7 +204,7 @@ public class RealHarFileParsingTest {
         HarEntry harEntry = new HarEntry();
         HarRequest request = new Gson().fromJson(json, HarRequest.class);
         harEntry.setRequest(request);
-        ParsedRequest parsed = new HarBridgeEntryParser<>(new SstoehrHarBridge()).parseRequest(harEntry);
+        ParsedRequest parsed = HarBridgeEntryParser.withPlainEncoder(new SstoehrHarBridge()).parseRequest(harEntry);
         assertTrue("body present", parsed.isBodyPresent());
         byte[] body;
         try (InputStream in = parsed.openBodyStream()) {

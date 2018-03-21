@@ -5,12 +5,14 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteSource;
 import org.brotli.dec.BrotliInputStream;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -56,6 +58,10 @@ public class HttpContentCodecs {
         return ENCODING_SPLITTER
                 .splitToList(contentEncodingHeaderValue)
                 .stream().map(String::toLowerCase).collect(ImmutableList.toImmutableList());
+    }
+
+    static ImmutableList<String> parseContentEncodings(@Nullable String contentEncodingHeaderValue) {
+        return parseEncodings(contentEncodingHeaderValue);
     }
 
     static class GzipCompressor implements HttpContentCodec {
@@ -135,4 +141,5 @@ public class HttpContentCodecs {
     static ImmutableSet<String> getSupportedEncodings() {
         return codecs.keySet();
     }
+
 }
