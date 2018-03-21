@@ -21,6 +21,17 @@ class HarBridgeTests {
 
     }
 
+    public static int countLengthOfCommonPrefix(byte[] a, byte[] b) {
+        int n = 0;
+        while (n < a.length && n < b.length) {
+            if (a[n] != b[n]) {
+                break;
+            }
+            n++;
+        }
+        return n;
+    }
+
     public static ParsedRequest buildRequest(@Nullable String acceptEncodingHeaderValue) {
         Multimap<String, String> headers = ArrayListMultimap.create();
         if (acceptEncodingHeaderValue != null) {

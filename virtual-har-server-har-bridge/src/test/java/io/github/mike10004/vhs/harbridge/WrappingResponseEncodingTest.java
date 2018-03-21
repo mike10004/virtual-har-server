@@ -59,7 +59,7 @@ public class WrappingResponseEncodingTest {
                 response.get("bodySize").getAsLong(),
                 content.get("size").getAsLong(),
                 contentEncodingHeaderValue,
-                null, null);
+                null, null, UTF_8);
         String responseText = result.asByteSource().asCharSource(UTF_8).read();
         assertEquals("text", text, responseText);
 

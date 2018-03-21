@@ -16,7 +16,6 @@ import de.sstoehr.harreader.model.HarResponse;
 import de.sstoehr.harreader.model.HttpMethod;
 import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarResponseData;
-import io.github.mike10004.vhs.harbridge.HarResponseDataTransformer;
 import io.github.mike10004.vhs.harbridge.HarResponseEncoding;
 import io.github.mike10004.vhs.harbridge.Hars;
 import io.github.mike10004.vhs.harbridge.HttpContentCodecs;
@@ -28,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collections;
 import java.util.List;
@@ -41,6 +42,18 @@ import static java.util.Objects.requireNonNull;
 public class SstoehrHarBridge implements HarBridge<HarEntry> {
 
     private static final Logger log = LoggerFactory.getLogger(SstoehrHarBridge.class);
+
+    public static final Charset DEFAULT_EX_MACHINA_CHARSET = StandardCharsets.UTF_8;
+
+    private final Charset exMachinaCharset;
+
+    public SstoehrHarBridge() {
+        this(DEFAULT_EX_MACHINA_CHARSET);
+    }
+
+    public SstoehrHarBridge(Charset exMachinaCharset) {
+        this.exMachinaCharset = requireNonNull(exMachinaCharset);
+    }
 
     @Override
     public String getRequestMethod(HarEntry entry) {
@@ -110,7 +123,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
                 String postDataText = postData.getText();
                 @Nullable Long requestBodySize = nullIfNegative(request.getBodySize());
                 @Nullable String postDataComment = postData.getComment();
-                return Hars.getRequestPostData(pairs, contentType, postDataText, requestBodySize, postDataComment);
+                return Hars.getRequestPostData(pairs, contentType, postDataText, requestBodySize, postDataComment, exMachinaCharset);
             }
         }
         return null;
@@ -160,7 +173,7 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         @Nullable String contentType = content.getMimeType();
         @Nullable String comment = content.getComment();
         @Nullable String text = content.getText();
-        return Hars.translateResponseContent(contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment);
+        return Hars.translateResponseContent(contentType, text, bodySize, harContentSize, contentEncodingHeaderValue, harContentEncoding, comment, exMachinaCharset);
     }
 
     @Override

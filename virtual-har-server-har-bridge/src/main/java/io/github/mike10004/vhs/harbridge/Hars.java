@@ -21,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Static utility methods relating to HAR data.
  */
@@ -78,16 +80,19 @@ public class Hars {
         return false;
     }
 
-    /*
-     * TODO figure out what the implications of using utf8 here would be
+    /**
      *
-     * I hate this, but it's likely the default encoding a user agent would select
-     * if none was specified for a byte stream coming across the wire.
+     * @param params
+     * @param contentType
+     * @param postDataText
+     * @param requestBodySize
+     * @param postDataComment
+     * @param defaultCharset charset that will be applied if content-type does not specify one
+     * @return
+     * @throws IOException
      */
-    private static final Charset DEFAULT_HTTP_CHARSET = StandardCharsets.ISO_8859_1;
-
     @Nullable
-    public static ByteSource getRequestPostData(@Nullable List<NameValuePair> params, String contentType, String postDataText, @Nullable Long requestBodySize, @Nullable String postDataComment) throws IOException {
+    public static ByteSource getRequestPostData(@Nullable List<NameValuePair> params, String contentType, String postDataText, @Nullable Long requestBodySize, @Nullable String postDataComment, Charset defaultCharset) throws IOException {
         if (params != null && !params.isEmpty()) {
             if (Strings.isNullOrEmpty(contentType)) {
                 contentType = MediaType.FORM_DATA.toString();
@@ -95,7 +100,7 @@ public class Hars {
             MediaType mediaType = MediaType.parse(contentType);
             return toByteSourceFromPairs(params, mediaType);
         } else {
-            return translateRequestContent(contentType, postDataText, requestBodySize, null, postDataComment);
+            return translateRequestContent(contentType, postDataText, requestBodySize, null, postDataComment, defaultCharset);
         }
     }
 
@@ -121,8 +126,9 @@ public class Hars {
                                                       @Nullable String text,
                                                       @Nullable Long requestBodySize,
                                                       @SuppressWarnings("SameParameterValue") @Nullable String harContentEncoding,
-                                                      @SuppressWarnings("unused") @Nullable String comment) {
-        return getUncompressedContent(contentType, text, requestBodySize, null, null, harContentEncoding, comment, DEFAULT_HTTP_CHARSET).asByteSource();
+                                                      @SuppressWarnings("unused") @Nullable String comment,
+                                                      Charset defaultCharset) {
+        return getUncompressedContent(contentType, text, requestBodySize, null, null, harContentEncoding, comment, defaultCharset).asByteSource();
     }
 
     /**
@@ -189,20 +195,6 @@ public class Hars {
     }
 
     /**
-     * @see #getUncompressedContent(String, String, Long, Long, String, String, String, Charset)
-     */
-    public static TypedContent translateResponseContent(
-                                                                      String contentType,
-                                                                      @Nullable String text,
-                                                                      @Nullable Long bodySize,
-                                                                      @Nullable Long contentSize,
-                                                                      @Nullable String contentEncodingHeaderValue,
-                                                                      @Nullable String harContentEncoding,
-                                                                      @SuppressWarnings("unused") @Nullable String comment) {
-        return getUncompressedContent(contentType, text, bodySize, contentSize, contentEncodingHeaderValue, harContentEncoding, comment, DEFAULT_HTTP_CHARSET);
-    }
-
-    /**
      * Gets the uncompressed, unencoded data that constitutes the body of a response captured
      * in a HAR entry, given the various HAR response and HAR content fields that describe it.
      * @param contentType content MIME type
@@ -216,9 +208,20 @@ public class Hars {
      * @param contentEncodingHeaderValue value of the Content-Encoding header
      * @param harContentEncoding value of the HAR content "encoding" field
      * @param comment HAR content comment
-     * @param charset default charset to use in decoding bytes
+     * @param defaultCharset charset that will be applied to return value if content-type does not specify one
      * @return a byte source that supplies a stream of the response body as unencoded, uncompressed bytes
      */
+    public static TypedContent translateResponseContent(              String contentType,
+                                                                      @Nullable String text,
+                                                                      @Nullable Long bodySize,
+                                                                      @Nullable Long contentSize,
+                                                                      @Nullable String contentEncodingHeaderValue,
+                                                                      @Nullable String harContentEncoding,
+                                                                      @SuppressWarnings("unused") @Nullable String comment,
+                                                                      Charset defaultCharset) {
+        return getUncompressedContent(contentType, text, bodySize, contentSize, contentEncodingHeaderValue, harContentEncoding, comment, defaultCharset);
+    }
+
     static TypedContent getUncompressedContent(@Nullable String contentType,
                                                @Nullable String text,
                                                @Nullable Long bodySize,
@@ -245,19 +248,24 @@ public class Hars {
             ByteSource decodedDataSource = decodingSource(text, contentEncodingHeaderValue, harContentEncoding, bodySize, contentSize);
             return TypedContent.identity(decodedDataSource, mediaType);
         } else {
-            Charset charset = defaultCharset;
+            @Nullable Charset charset_ = null;
             try {
-                charset = MediaType.parse(contentType).charset().or(charset);
+                charset_ = MediaType.parse(contentType).charset().orNull();
             } catch (RuntimeException ignore) {
             }
-            Charset adjustedCharset = detectCharset(text, charset);
+            Charset adjustedCharset = adjustCharset(text, charset_, defaultCharset);
             ByteSource data = CharSource.wrap(text).asByteSource(adjustedCharset);
             MediaType adjustedContentType = mediaType.withCharset(adjustedCharset);
             return TypedContent.identity(data, adjustedContentType);
         }
     }
 
-    static Charset detectCharset(String text, Charset charset) {
+    static Charset adjustCharset(String text, @Nullable Charset charset, Charset defaultCharset) {
+        requireNonNull(defaultCharset, "default charset");
+        text = Strings.nullToEmpty(text);
+        if (charset == null) {
+            return defaultCharset;
+        }
         CharsetEncoder encoder = charset.newEncoder();
         if (encoder.canEncode(text)) {
             return charset;
