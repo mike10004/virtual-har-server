@@ -17,23 +17,17 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * Transformer of {@link HarResponseData} objects.
- * @see HarResponseData#transform()
+ * @see HarResponseData#transformer()
  */
 public final class HarResponseDataTransformer {
 
+    private final HarResponseData preTransformData;
     private Function<ByteSource, ByteSource> bodyTransform = Functions.identity();
     private Function<MediaType, MediaType> contentTypeTransform = Functions.identity();
     private Function<Stream<Map.Entry<String, String>>, Stream<Map.Entry<String, String>>> headersTransform = Functions.identity();
 
-    private HarResponseDataTransformer() {
-    }
-
-    /**
-     * Method for use by {@link HarResponseData#transform()}.
-     * @return a new transformer instance
-     */
-    static HarResponseDataTransformer build() {
-        return new HarResponseDataTransformer();
+    HarResponseDataTransformer(HarResponseData preTransformData) {
+        this.preTransformData = requireNonNull(preTransformData, "preTransformData");
     }
 
     public HarResponseDataTransformer body(Function<ByteSource, ByteSource> bodyTransform) {
@@ -81,10 +75,10 @@ public final class HarResponseDataTransformer {
                 .contentType(old -> contentType);
     }
 
-    public LazyHarResponseData transform(HarResponseData wrapped) {
-        requireNonNull(wrapped);
-        return new LazyHarResponseData(() -> bodyTransform.apply(wrapped.getBody()),
-                () -> contentTypeTransform.apply(wrapped.getContentType()),
-                () -> headersTransform.apply(wrapped.headers().stream()).collect(ImmutableList.toImmutableList()));
+    public HarResponseData transform() {
+        requireNonNull(preTransformData);
+        return new LazyHarResponseData(() -> bodyTransform.apply(preTransformData.getBody()),
+                () -> contentTypeTransform.apply(preTransformData.getContentType()),
+                () -> headersTransform.apply(preTransformData.headers().stream()).collect(ImmutableList.toImmutableList()));
     }
 }

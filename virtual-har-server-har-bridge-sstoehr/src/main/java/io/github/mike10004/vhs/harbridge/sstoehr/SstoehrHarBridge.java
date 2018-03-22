@@ -135,10 +135,10 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         TypedContent contentPackage = getResponseBody(entry);
         List<Map.Entry<String, String>> headers = getResponseHeaders(entry);
         HarResponseData underlying = HarResponseData.of(headers, contentPackage.getContentType(), contentPackage.asByteSource());
-        underlying = HarResponseData.transform()
+        underlying = underlying.transformer()
                 .replaceContentType(contentPackage.getContentType())
                 .replaceHeader(HttpHeaders.CONTENT_ENCODING, HttpContentCodecs.CONTENT_ENCODING_IDENTITY)
-                .transform(underlying);
+                .transform();
         return encoding.transformUnencoded(underlying);
     }
 

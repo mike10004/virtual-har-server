@@ -21,8 +21,8 @@ public interface HarResponseData {
         return new SimpleHarResponseData(headers, contentType, body);
     }
 
-    static HarResponseDataTransformer transform() {
-        return HarResponseDataTransformer.build();
+    default HarResponseDataTransformer transformer() {
+        return new HarResponseDataTransformer(this);
     }
 
     @Nullable
