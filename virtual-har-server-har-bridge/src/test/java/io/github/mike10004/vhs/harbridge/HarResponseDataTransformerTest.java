@@ -48,4 +48,20 @@ public class HarResponseDataTransformerTest {
         assertEquals("2", valuePost2, transformed.getFirstHeaderValue(name2));
         assertEquals("1", valuePost1, transformed.getFirstHeaderValue(name1));
     }
+
+    @Test
+    public void filterHeaders() throws Exception {
+        Iterable<Map.Entry<String, String>> originalHeaders = ImmutableMap.<String, String>builder()
+                .put("a", "1")
+                .put("b", "2")
+                .put("c", "3")
+                .build().entrySet();
+        HarResponseData responseData = HarResponseData.of(originalHeaders, null, null);
+        HarResponseData transformed = responseData.transformer()
+                .filterHeaders(header -> !"b".equalsIgnoreCase(header.getKey()))
+                .transform();
+        assertEquals("a", "1", transformed.getFirstHeaderValue("a"));
+        assertEquals("c", "3", transformed.getFirstHeaderValue("c"));
+        assertNull("b", transformed.getFirstHeaderValue("b"));
+    }
 }

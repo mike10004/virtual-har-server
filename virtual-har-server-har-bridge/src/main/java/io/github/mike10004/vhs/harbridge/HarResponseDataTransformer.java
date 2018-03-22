@@ -16,7 +16,10 @@ import java.util.stream.Stream;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Transformer of {@link HarResponseData} objects.
+ * Transformer of {@link HarResponseData} objects. A transformer is a builder
+ * that collects operations to be performed on an underlying response data instance.
+ * The {@link #transform()} method returns a response data instance that
+ * reflects the set of transforms applied.
  * @see HarResponseData#transformer()
  */
 public final class HarResponseDataTransformer {
@@ -40,8 +43,8 @@ public final class HarResponseDataTransformer {
         return this;
     }
 
-    public HarResponseDataTransformer headers(Function<Stream<Map.Entry<String, String>>, Stream<Map.Entry<String, String>>> headersSupplier) {
-        this.headersTransform = headersSupplier;
+    public HarResponseDataTransformer headers(Function<Stream<Map.Entry<String, String>>, Stream<Map.Entry<String, String>>> headersTransform) {
+        this.headersTransform = this.headersTransform.andThen(headersTransform);
         return this;
     }
 

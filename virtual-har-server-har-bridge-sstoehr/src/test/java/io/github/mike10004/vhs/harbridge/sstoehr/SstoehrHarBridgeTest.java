@@ -95,8 +95,8 @@ public class SstoehrHarBridgeTest {
         ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("http://www.example.com/"), ImmutableMultimap.of(), ImmutableMultimap.of(), null);
         HarResponseData responseData = bridge.getResponseData(request, entry, HarResponseEncoding.unencoded());
         assertEquals("body size", responseBody.length, responseData.getBody().size());
-        assertEquals(contentType, responseData.getContentType());
-        assertEquals(0, (responseData.headers()).size());
+        assertEquals("content type", contentType, responseData.getContentType());
+        assertEquals("number of headers", entry.getResponse().getHeaders().size(), (responseData.headers()).size());
     }
 
     @Test
