@@ -246,13 +246,17 @@ public class HarsTest {
     @Test
     public void complicatedTextEncodingIssue() throws Exception {
         String contentType = "text/javascript";
-        Long bodySize = 32L;
         String harContentEncoding = null;
         String contentEncodingHeaderValue = "br";
         String comment = "";
-        byte[] expectedBytes = BaseEncoding.base16().decode("616C73655D2C5B2274657874222C223AC2A0225D2C5B226F70656E2D656C656D");
-        String text = new String(expectedBytes, UTF_8);
-        Long contentSize = 32L;
+        String text = "let nbsp=\"\u00A0\";";
+        byte[] expectedBytes = text.getBytes(UTF_8);
+        String expectedBytesHex = BaseEncoding.base16().encode(expectedBytes);
+        System.out.format("complicated text: \"%s\"%n", StringEscapeUtils.escapeJava(text));
+        System.out.format("%s decoded with %s is: %s%n", expectedBytesHex, UTF_8, new String(expectedBytes, UTF_8));
+        System.out.format("%s decoded with %s is: %s%n", expectedBytesHex, ISO_8859_1, new String(expectedBytes, ISO_8859_1));
+        long contentSize = expectedBytes.length;
+        long bodySize = expectedBytes.length;
         @SuppressWarnings("UnnecessaryLocalVariable")
         Charset EX_MACHINA_CHARSET = UTF_8;
         @SuppressWarnings("ConstantConditions")

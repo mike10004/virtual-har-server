@@ -3,10 +3,12 @@ package io.github.mike10004.vhs.harbridge.sstoehr;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.io.ByteSource;
+import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.gson.Gson;
 import de.sstoehr.harreader.model.HarContent;
 import de.sstoehr.harreader.model.HarEntry;
+import de.sstoehr.harreader.model.HarHeader;
 import de.sstoehr.harreader.model.HarRequest;
 import de.sstoehr.harreader.model.HarResponse;
 import de.sstoehr.harreader.model.HttpMethod;
@@ -14,6 +16,7 @@ import io.github.mike10004.vhs.harbridge.HarBridge;
 import io.github.mike10004.vhs.harbridge.HarResponseData;
 import io.github.mike10004.vhs.harbridge.HarResponseEncoding;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
+import io.github.mike10004.vhs.harbridge.TypedContent;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -24,9 +27,12 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -43,21 +49,30 @@ public class SstoehrHarBridgeTest {
     private byte[] responseBody = responseText.getBytes(contentType.charset().get());
 
     @Before
-    public void thing() throws Exception {
-        entry = new HarEntry();
+    public void createCommonEntry() throws Exception {
+        entry = createHarEntry(url, contentType, responseText, responseBody.length);
+    }
+
+    private static HarEntry createHarEntry(URI requestUrl, MediaType responseContentType, String responseText, long responseBodyLength) {
+        HarEntry entry = new HarEntry();
         HarRequest request = new HarRequest();
         request.setMethod(HttpMethod.GET);
-        request.setUrl(url.toString());
+        request.setUrl(requestUrl.toString());
         HarResponse response = new HarResponse();
         response.setStatus(200);
         response.setStatusText("OK");
+        HarHeader contentTypeHeader = new HarHeader();
+        contentTypeHeader.setName(HttpHeaders.CONTENT_TYPE);
+        contentTypeHeader.setValue(responseContentType.toString());
+        response.getHeaders().add(contentTypeHeader);
         HarContent harContent = new HarContent();
-        harContent.setMimeType(contentType.toString());
+        harContent.setMimeType(responseContentType.toString());
         harContent.setText(responseText);
-        response.setBodySize((long) responseBody.length);
+        response.setBodySize(responseBodyLength);
         response.setContent(harContent);
         entry.setRequest(request);
         entry.setResponse(response);
+        return entry;
     }
 
     @Test
@@ -144,7 +159,7 @@ public class SstoehrHarBridgeTest {
         harEntry.setRequest(request);
         ByteSource postData = new SstoehrHarBridge().getRequestPostData(harEntry);
         assertNotNull("post data", postData);
-        HttpEntity entity = makeEntity(postData, MediaType.FORM_DATA.withCharset(StandardCharsets.UTF_8));
+        HttpEntity entity = makeEntity(postData, MediaType.FORM_DATA.withCharset(UTF_8));
         List<NameValuePair> params = URLEncodedUtils.parse(entity);
         assertEquals("num params", 1, params.size());
         NameValuePair param = params.iterator().next();
@@ -159,7 +174,7 @@ public class SstoehrHarBridgeTest {
     }
 
     @Test
-    public void getContenttype_absent() throws Exception {
+    public void getContentType_absent() throws Exception {
         HarBridge<HarEntry> bridge = new SstoehrHarBridge();
         HarEntry entry = new HarEntry();
         HarResponse response = new HarResponse();
@@ -171,6 +186,33 @@ public class SstoehrHarBridgeTest {
         assertEquals("body", 0, actual.getBody().read().length);
         assertEquals("content-type", HarBridge.getContentTypeDefaultValue(), actual.getContentType());
         assertEquals("", 0, actual.headers().size());
+    }
 
+    @Test
+    public void getResponseBody_addExMachinaCharsetToContentTypeHeader() throws Exception {
+        Charset exMachinaCharset = UTF_8;
+        SstoehrHarBridge bridge = new SstoehrHarBridge(exMachinaCharset);
+        ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("http://foo.bar/"), null, ImmutableMultimap.of(), null);
+        MediaType entryResponseContentType = MediaType.PLAIN_TEXT_UTF_8.withoutParameters();
+        HarEntry entry = createHarEntry(request.url, entryResponseContentType, "foo", 3);
+        TypedContent content = bridge.getResponseBody(entry);
+        MediaType expectedResponseContentType = entryResponseContentType.withCharset(exMachinaCharset);
+        assertEquals("content type", expectedResponseContentType, content.getContentType());
+    }
+
+    @Test
+    public void getResponseData_contentTypeExMachina() throws Exception {
+        Charset exMachinaCharset = UTF_8;
+        SstoehrHarBridge bridge = new SstoehrHarBridge(exMachinaCharset);
+        ParsedRequest request = ParsedRequest.inMemory(io.github.mike10004.vhs.harbridge.HttpMethod.GET, URI.create("http://foo.bar/"), null, ImmutableMultimap.of(), null);
+        MediaType entryResponseContentType = MediaType.PLAIN_TEXT_UTF_8.withoutParameters();
+        HarEntry entry = createHarEntry(request.url, entryResponseContentType, "foo", 3);
+        HarResponseData responseData = bridge.getResponseData(request, entry, HarResponseEncoding.unencoded());
+        MediaType expectedResponseContentType = entryResponseContentType.withCharset(exMachinaCharset);
+        MediaType responseDataContentType = responseData.getContentType();
+        assertEquals("responseDataContentType", expectedResponseContentType, responseDataContentType);
+        String responseDataContentTypeHeaderValue = responseData.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
+        assertNotNull("expect responseData to contain content-type header", responseDataContentTypeHeaderValue);
+        assertEquals("responseData content-type header value", expectedResponseContentType, MediaType.parse(responseDataContentTypeHeaderValue));
     }
 }
