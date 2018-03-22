@@ -1,5 +1,6 @@
 package io.github.mike10004.vhs.harbridge.sstoehr;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -156,7 +157,8 @@ public class SstoehrHarBridge implements HarBridge<HarEntry> {
         return ImmutableList.of();
     }
 
-    private TypedContent getResponseBody(HarEntry entry) throws IOException {
+    @VisibleForTesting
+    TypedContent getResponseBody(HarEntry entry) throws IOException {
         HarResponse rsp = entry.getResponse();
         if (rsp == null) {
             return TypedContent.identity(ByteSource.empty(), MediaType.OCTET_STREAM);
