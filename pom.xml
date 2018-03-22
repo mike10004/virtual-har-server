@@ -8,7 +8,7 @@
     <artifactId>virtual-har-server</artifactId>
     <name>virtual-har-server</name>
     <packaging>pom</packaging>
-    <version>0.18</version>
+    <version>0.19-SNAPSHOT</version>
     <description>API and library for an HTTP server that responds with content from a HAR</description>
     <url>https://github.com/mike10004/virtual-har-server</url>
     <inceptionYear>2016</inceptionYear>
