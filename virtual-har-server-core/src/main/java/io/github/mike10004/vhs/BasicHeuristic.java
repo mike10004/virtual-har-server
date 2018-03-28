@@ -35,7 +35,29 @@ import static java.util.Objects.requireNonNull;
  */
 public class BasicHeuristic implements Heuristic {
 
-    private static final Charset DEFAULT_FORM_DATA_CHARSET = StandardCharsets.ISO_8859_1;
+    /**
+     * Default character encoding for {@code x-www-form-urlencoded}.
+     *
+     * <p>Browsermob has this note about default charsets:
+     * <blockquote>
+     * The default charset when the Content-Type header does not specify a charset. According to RFC 7231 Appendix B:
+     * <pre>
+     *     The default charset of ISO-8859-1 for text media types has been
+     *     removed; the default is now whatever the media type definition says.
+     *     Likewise, special treatment of ISO-8859-1 has been removed from the
+     *     Accept-Charset header field.
+     * </pre>
+     *
+     * Technically, we would have to determine the charset on a per-content-type basis, but generally speaking, UTF-8 is a
+     * pretty safe default. (NOTE: In the previous HTTP/1.1 spec, section 3.7.1, the default charset was defined as ISO-8859-1.)
+     * </blockquote>
+     *
+     * The media type {@code x-www-form-urlencoded} is not technically a text media type, but URLs
+     * are supposed to be ASCII safe, and the media type definition https://www.iana.org/assignments/media-types/application/x-www-form-urlencoded
+     * specifies the "7bit" encoding consideration. We default to UTF-8 because it is a superset of
+     * ASCII and supports more characters than ISO-8859-1.
+     */
+    private static final Charset DEFAULT_FORM_DATA_CHARSET = StandardCharsets.UTF_8;
 
     public static final int DEFAULT_THRESHOLD_EXCLUSIVE = 0;
 
