@@ -1,17 +1,17 @@
 package io.github.mike10004.vhs.harbridge;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableTable;
 import com.google.common.collect.Table;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
+import com.google.common.io.CharSource;
 import com.google.common.io.Resources;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.jayway.jsonpath.JsonPath;
+import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import org.apache.commons.text.StringEscapeUtils;
 import org.junit.Test;
 
@@ -20,56 +20,21 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class HarsTest {
 
-    @Test
-    public void isBase64Encoded() {
-        ImmutableMap.<Base64TestCase, Boolean>builder()
-                .put(new Base64TestCase("text/plain", "abc", null, 3L), false)
-                .put(new Base64TestCase("text/plain", "abc", null, null), false)
-                .put(new Base64TestCase("text/plain", "abc", "base64", null), true)
-                .put(new Base64TestCase("text/plain", "abc", "base64", 3L), true)
-                .put(new Base64TestCase("application/octet-stream", "abc", null, null), true)
-                .build().forEach((testCase, expected) -> {
-            boolean actual = Hars.isBase64Encoded(testCase.contentType, testCase.text, testCase.encoding, testCase.size);
-            assertEquals("expected " + expected + " for " + testCase, expected, actual);
-        });
-    }
-
-    private static class Base64TestCase {
-        String contentType, text, encoding;
-        Long size;
-
-        public Base64TestCase(String contentType, String text, String encoding, Long size) {
-            this.contentType = contentType;
-            this.text = text;
-            this.encoding = encoding;
-            this.size = size;
-        }
-
-        @Override
-        public String toString() {
-            return "Base64TestCase{" +
-                    "contentType='" + contentType + '\'' +
-                    ", text='" + text + '\'' +
-                    ", encoding='" + encoding + '\'' +
-                    ", size=" + size +
-                    '}';
-        }
-    }
 
     @Test
     public void testGzippedHtml() throws Exception {
@@ -223,27 +188,6 @@ public class HarsTest {
     }
 
     @Test
-    public void isBase64Encoded_json() throws IOException {
-        String contentType = "application/json";
-        String text = new Gson().toJson(ImmutableMap.of("apples", 1156, "peaches", 4689236, "pumpkin", 3275175, "pie", 1235856));
-        String harContentEncoding = null;
-        Long bodySize = text.length() / 2L;
-        //noinspection ConstantConditions
-        assertFalse("json text isBase64Encoded", Hars.isBase64Encoded(contentType, text, harContentEncoding, bodySize));
-    }
-
-    @Test
-    public void isBase64Encoded_base64()  throws Exception {
-        String contentType = "application/json";
-        byte[] bytes = new byte[290];
-        new Random(getClass().getName().hashCode()).nextBytes(bytes);
-        String text = BaseEncoding.base64().encode(bytes);
-        String harContentEncoding = "base64";
-        Long bodySize = (long) bytes.length;
-        assertTrue("text isBase64Encoded", Hars.isBase64Encoded(contentType, text, harContentEncoding, bodySize));
-    }
-
-    @Test
     public void complicatedTextEncodingIssue() throws Exception {
         String contentType = "text/javascript";
         String harContentEncoding = null;
@@ -265,6 +209,23 @@ public class HarsTest {
         int actualSize = actualBytes.length;
         assertEquals("actual size", expectedBytes.length, actualSize);
         assertEquals("content-type charset", UTF_8, typedContent.getContentType().charset().orNull());
+    }
+
+    @Test
+    public void getRequestPostData() throws Exception {
+        List<NameValuePair> pairs = new ArrayList<>();
+        String contentType = "multipart/mixed; boundary=ABCDEF_1522096137171";
+        String postDataText = "--ABCDEF_1522096137171\r\n" +
+                "Content-Type: application/x-www-form-urlencoded\r\n" +
+                "\r\n" +
+                "foo=bar&baz=gaw\r\n" +
+                "--ABCDEF_1522096137171--";
+        String postDataComment = "";
+        Long requestBodySize = 116L;
+        ByteSource actual = Hars.getRequestPostData(pairs, contentType, postDataText, requestBodySize, postDataComment, UTF_8);
+        assertNotNull("byte source not null is expected", actual);
+        ByteSource expected = CharSource.wrap(postDataText).asByteSource(StandardCharsets.US_ASCII);
+        assertEquals("bytes", BaseEncoding.base16().encode(expected.read()), BaseEncoding.base16().encode(actual.read()));
     }
 
 }

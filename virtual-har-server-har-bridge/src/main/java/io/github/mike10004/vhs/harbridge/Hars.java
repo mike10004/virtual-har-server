@@ -9,6 +9,7 @@ import com.google.common.io.CharSource;
 import com.google.common.net.MediaType;
 import io.github.mike10004.vhs.repackaged.org.apache.http.NameValuePair;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +21,7 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -32,15 +34,14 @@ public class Hars {
 
     static final MediaType CONTENT_TYPE_DEFAULT_VALUE = MediaType.OCTET_STREAM;
 
-    private static final CharMatcher BASE_64_ALPHABET = CharMatcher.inRange('A', 'Z')
-            .or(CharMatcher.inRange('a', 'z'))
-            .or(CharMatcher.inRange('0', '9'))
-            .or(CharMatcher.anyOf("/+="));
+    // TODO maybe allow line breaks within base-64 strings
+    private static final Pattern BASE_64_PATTERN = Pattern.compile("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$");
 
     private static final Charset DEFAULT_WWW_FORM_DATA_CHARSET = StandardCharsets.UTF_8;
 
-    private static boolean isAllBase64Alphabet(String text) {
-        return BASE_64_ALPHABET.matchesAllOf(text);
+    // https://stackoverflow.com/a/8571649/2657036
+    private static boolean isValidBase64Encoding(String text) {
+        return text != null && BASE_64_PATTERN.matcher(text).find();
     }
 
     /**
@@ -56,14 +57,15 @@ public class Hars {
         if ("base64".equalsIgnoreCase(harContentEncoding)) {
             return true;
         }
-        if (!ContentTypes.isTextLike(contentType)) {
-            return true;
-        }
         if (text.length() == 0) {
             return true; // because it won't matter, nothing will be decoded
         }
-        if (!isAllBase64Alphabet(text)) {
+        boolean validBase64 = isValidBase64Encoding(text);
+        if (!validBase64) {
             return false;
+        }
+        if (!ContentTypes.isTextLike(contentType)) {
+            return true;
         }
         if (bodySize != null) {
             /*
@@ -93,6 +95,7 @@ public class Hars {
      */
     @Nullable
     public static ByteSource getRequestPostData(@Nullable List<NameValuePair> params, String contentType, String postDataText, @Nullable Long requestBodySize, @Nullable String postDataComment, Charset defaultCharset) throws IOException {
+        // by the HAR spec, a postData object contains (params XOR text)
         if (params != null && !params.isEmpty()) {
             if (Strings.isNullOrEmpty(contentType)) {
                 contentType = MediaType.FORM_DATA.toString();
@@ -230,14 +233,15 @@ public class Hars {
                                                @Nullable String harContentEncoding,
                                                @SuppressWarnings("unused") @Nullable String comment,
                                                Charset defaultCharset) {
-        if (contentType == null) {
+        contentType = Strings.nullToEmpty(contentType).trim();
+        if (contentType.isEmpty()) {
             contentType = MediaType.OCTET_STREAM.toString();
         }
         MediaType mediaType;
         try {
             mediaType = MediaType.parse(contentType);
         } catch (RuntimeException e) {
-            log.info("failed to parse content-type {}", contentType);
+            log.info("failed to parse content-type \"{}\"", StringEscapeUtils.escapeJava(contentType));
             mediaType = MediaType.OCTET_STREAM;
         }
         if (text == null) {

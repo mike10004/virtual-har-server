@@ -27,6 +27,12 @@ class ContentTypes {
             if (mime.is(MediaType.ANY_TEXT_TYPE)) {
                 return true;
             }
+            if (isSubtypeXmlish(mime)) {
+                return true;
+            }
+            if (isSubtypeJsonish(mime)) {
+                return true;
+            }
             if (TEXT_LIKE_TYPES.contains(mime)) {
                 return true;
             }
@@ -34,9 +40,21 @@ class ContentTypes {
         return false;
     }
 
+    private static boolean isSubtypeXmlish(MediaType mime) {
+        String subtype = mime.subtype();
+        return "xml".equals(subtype) || subtype.endsWith("+xml");
+    }
+
+    private static boolean isSubtypeJsonish(MediaType mime) {
+        String subtype = mime.subtype();
+        return "json".equals(subtype) || subtype.endsWith("+json");
+    }
+
     private static final ImmutableSet<MediaType> TEXT_LIKE_TYPES = ImmutableSet.<MediaType>builder()
             .add(MediaType.JAVASCRIPT_UTF_8.withoutParameters())
             .add(MediaType.JSON_UTF_8.withoutParameters())
-            .add(MediaType.CSS_UTF_8.withoutParameters())
+            .add(MediaType.FORM_DATA.withoutParameters())
+            .add(MediaType.DART_UTF_8.withoutParameters())
+            .add(MediaType.RTF_UTF_8.withoutParameters())
             .build();
 }
