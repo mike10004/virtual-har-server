@@ -37,10 +37,6 @@ package io.github.mike10004.vhs.harbridge;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-import com.google.common.io.Files;
-import com.google.common.io.Resources;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Ints;
@@ -65,17 +61,14 @@ import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -83,7 +76,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -99,6 +91,7 @@ public class MakeFileUploadHar {
         main(StandardCharsets.UTF_8, binaryFile);
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public static net.lightbody.bmp.core.har.Har main(Charset harOutputCharset, File binaryFile) throws IOException, InterruptedException {
         File harFile = File.createTempFile("file-upload-example", ".har");
         int port = 49111;
@@ -312,9 +305,9 @@ public class MakeFileUploadHar {
             List<MultipartFormData.FormDataPart> formDataParts;
             try {
                 formDataParts = MultipartFormData.getParser().decodeMultipartFormData(contentType, boundary, data);
-            } catch (MultipartFormData.MultipartFormDataParseException e) {
+            } catch (MultipartFormData.BadMultipartFormDataException e) {
                 e.printStackTrace(System.err);
-                return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.lookup(e.status), "text/plain", e.getMessage());
+                return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.lookup(MultipartFormData.BadMultipartFormDataException.STATUS_CODE), "text/plain", e.getMessage());
             }
             System.out.format("%d parts parsed from request body%n", formDataParts.size());
             formDataParts.forEach(part -> {

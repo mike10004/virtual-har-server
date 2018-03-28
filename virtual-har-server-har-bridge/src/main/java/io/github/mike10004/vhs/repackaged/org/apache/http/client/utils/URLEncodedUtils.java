@@ -229,7 +229,7 @@ public class URLEncodedUtils {
      * @param charset the charset to use
      * @return encoded string
      */
-    private static String encodeFormFields (final String content, final Charset charset) {
+    public static String encodeFormFields (final String content, final Charset charset) {
         if (content == null) {
             return null;
         }
