@@ -17,9 +17,11 @@ import org.apache.http.ssl.TrustStrategy;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 
@@ -100,4 +102,25 @@ public class Tests {
         configureClientToTrustBlindly(b);
         return b.build();
     }
+
+    public static File copyImageForUpload(Path directory) throws IOException {
+        return copyFileFromClasspath("/image-for-upload.jpg", "image-for-upload", ".jpeg", directory);
+    }
+
+    public static File copyFileUploadExampleHar(Path directory) throws IOException {
+        return copyFileFromClasspath("/file-upload-example.har", "file-upload-example", ".har", directory);
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private static File copyFileFromClasspath(String resourcePath, String prefix, String suffix, Path tempdir) throws IOException {
+        URL resource = Tests.class.getResource(resourcePath);
+        if (resource == null) {
+            throw new FileNotFoundException(resourcePath);
+        }
+        File file = File.createTempFile(prefix, suffix, tempdir.toFile());
+        Resources.asByteSource(resource).copyTo(Files.asByteSink(file));
+        file.deleteOnExit();
+        return file;
+    }
+
 }
