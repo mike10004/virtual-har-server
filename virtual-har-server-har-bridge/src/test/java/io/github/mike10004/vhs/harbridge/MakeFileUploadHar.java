@@ -304,7 +304,7 @@ public class MakeFileUploadHar {
             }
             List<MultipartFormData.FormDataPart> formDataParts;
             try {
-                formDataParts = MultipartFormData.getParser().decodeMultipartFormData(contentType, boundary, data);
+                formDataParts = MultipartFormData.getParser().decodeMultipartFormData(contentType, data);
             } catch (MultipartFormData.BadMultipartFormDataException e) {
                 e.printStackTrace(System.err);
                 return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.lookup(MultipartFormData.BadMultipartFormDataException.STATUS_CODE), "text/plain", e.getMessage());

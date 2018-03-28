@@ -22,6 +22,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,11 +30,21 @@ import java.util.regex.Pattern;
 public class MultipartFormData {
 
     private static final int HTTP_ERROR_BAD_REQUEST = 400;
-
+    private static final Charset DEFAULT_MULTIPART_FORM_DATA_ENCODING = StandardCharsets.UTF_8;
+    static final Charset URLENCODED_FORM_DATA_DEFAULT_ENCODING = StandardCharsets.UTF_8;
     private MultipartFormData() {}
 
     public interface FormDataParser {
-        List<FormDataPart> decodeMultipartFormData(MediaType contentType, String boundary, byte[] data) throws BadMultipartFormDataException, RuntimeIOException;
+        /**
+         * Parse multipart/form-data.
+         * See https://www.iana.org/assignments/media-types/multipart/form-data.
+         * @param contentType content type (must have boundary parameter, should probably be {@code multipart/form-data}
+         * @param data the data
+         * @return
+         * @throws BadMultipartFormDataException
+         * @throws RuntimeIOException
+         */
+        List<FormDataPart> decodeMultipartFormData(MediaType contentType, byte[] data) throws BadMultipartFormDataException, RuntimeIOException;
     }
 
     public static FormDataParser getParser() {
@@ -101,6 +112,19 @@ public class MultipartFormData {
         }
     }
 
+    static String getBoundaryOrDie(MediaType contentType) throws BadMultipartFormDataException {
+        @Nullable String boundary = contentType.parameters().entries().stream()
+                .filter(entry -> "boundary".equalsIgnoreCase(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst().orElse(null);
+        if (boundary == null) {
+            throw new BadMultipartFormDataException("'boundary' parameter not present in Content-Type: " + contentType.toString());
+        }
+        return boundary;
+    }
+
+    private static final Charset BOUNDARY_ENCODING = StandardCharsets.US_ASCII; // assume header value contains only ASCII
+
     static class NanohttpdFormDataParser implements FormDataParser {
 
         private static final int MAX_HEADER_SIZE = 1024;
@@ -117,10 +141,11 @@ public class MultipartFormData {
          * Decodes the Multipart Body data and put it into Key/Value pairs.
          */
         @Override
-        public List<FormDataPart> decodeMultipartFormData(MediaType contentType, String boundary, byte[] data) throws BadMultipartFormDataException {
-            Charset parentTypeEncoding = contentType.charset().or(StandardCharsets.US_ASCII);
+        public List<FormDataPart> decodeMultipartFormData(MediaType contentType, byte[] data) throws BadMultipartFormDataException {
+            Charset parentTypeEncoding = contentType.charset().or(DEFAULT_MULTIPART_FORM_DATA_ENCODING);
+            String boundary = getBoundaryOrDie(contentType);
+            byte[] boundaryBytes = boundary.getBytes(BOUNDARY_ENCODING);
             ByteBuffer fbuf = ByteBuffer.wrap(data);
-            byte[] boundaryBytes = boundary.getBytes(StandardCharsets.US_ASCII); // assume header value contains only ASCII
             int[] boundaryIdxs = getBoundaryPositions(fbuf, boundaryBytes);
             List<FormDataPart> parts = new ArrayList<>(boundaryIdxs.length);
             byte[] partHeaderBuff = new byte[MAX_HEADER_SIZE];

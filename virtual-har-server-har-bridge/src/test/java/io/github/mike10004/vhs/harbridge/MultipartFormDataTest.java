@@ -1,14 +1,13 @@
 package io.github.mike10004.vhs.harbridge;
 
+import com.google.common.base.Joiner;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.common.net.MediaType;
-import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
-import net.lightbody.bmp.util.BrowserMobHttpUtil;
-import net.lightbody.bmp.util.HttpMessageContents;
+import com.google.common.primitives.Bytes;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.junit.Rule;
@@ -22,14 +21,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkState;
-import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -68,10 +64,9 @@ public class MultipartFormDataTest {
 
     private void testDecode(TestCase testCase) throws IOException {
         MediaType contentType = testCase.getContentType();
-        String boundary = contentType.parameters().get("boundary").iterator().next();
         byte[] data = testCase.asByteSource().read();
         System.out.format("full data size: %s%n", data.length);
-        List<MultipartFormData.FormDataPart> parts = formDataParser.decodeMultipartFormData(contentType, boundary, data);
+        List<MultipartFormData.FormDataPart> parts = formDataParser.decodeMultipartFormData(contentType, data);
         for (int i = 0; i < parts.size() ;i++) {
             System.out.format("part[%d] = %s%n", i, parts.get(i));
         }
@@ -79,8 +74,9 @@ public class MultipartFormDataTest {
         MultipartFormData.FormDataPart paramPart = parts.get(1);
         assertFormDataPartEquals(paramPart, MediaType.FORM_DATA, "tag", null);
         assertNotNull(paramPart.file);
-        String paramValue = paramPart.file.asByteSource().asCharSource(US_ASCII).read();
+        String paramValue = paramPart.file.asByteSource().asCharSource(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING).read();
         String expectedParamValue = testCase.getExpectedParamValue();
+        System.out.format("param value:%n  expect %s%n  actual %s%n", Arrays.toString(expectedParamValue.getBytes(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING)), Arrays.toString(paramValue.getBytes(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING)));
         assertEquals("param value", expectedParamValue, paramValue);
         MultipartFormData.FormDataPart filePart = parts.get(0);
         assertFormDataPartEquals(filePart, MediaType.JPEG, "f", "image-for-upload3965121338549146845.jpeg");
@@ -187,10 +183,20 @@ public class MultipartFormDataTest {
     }
 
     private TestCase buildRequestBody() throws IOException {
-        String expectedParamValue = "Some UTF-8 text: \ud802\udd00\ud802\udd01\ud802\udd02";
-        System.out.format("String expectedParamValue = \"%s\";%n", StringEscapeUtils.escapeJava(expectedParamValue));
+        byte[] utf8EncodingOfGnarlyString = {
+                (byte) 0xf0, (byte) 0x9f, (byte) 0x82, (byte) 0xa1,
+                (byte) 0xf0, (byte) 0x9f, (byte) 0x82, (byte) 0xa8,
+                (byte) 0xf0,(byte) 0x9f, (byte) 0x83, (byte) 0x91,
+                (byte) 0xf0, (byte) 0x9f, (byte) 0x83, (byte) 0x98,
+                (byte) 0xf0, (byte) 0x9f, (byte) 0x83, (byte) 0x93,
+        };
+        String gnarlyString = new String(utf8EncodingOfGnarlyString, UTF_8);
+        String expectedParamValue = "Some UTF-8 text: " + gnarlyString;
+        System.out.format("String expectedParamValue = \"%s\"; // contains %s%n", StringEscapeUtils.escapeJava(expectedParamValue), gnarlyString);
+        byte[] expectedParamValueBytes = expectedParamValue.getBytes(UTF_8);
+        System.out.format("byte[] expectedParamValueBytes = {%s};%n", Joiner.on(", ").join(Bytes.asList(expectedParamValueBytes)));
         File imageFile = copyImageForUpload(temporaryFolder.getRoot().toPath());
-        Charset TEXT_CHARSET = US_ASCII;
+        Charset TEXT_CHARSET = UTF_8;
         String boundary = "----WebKitFormBoundarykWXf2mC9KePVVkV6";
         MediaType contentType = MediaType.parse(CONTENT_TYPE_NO_BOUNDARY).withParameter("boundary", boundary);
         String PRE_IMAGE_FILE_TEXT = String.format(preImageFileStrTemplate, boundary);
