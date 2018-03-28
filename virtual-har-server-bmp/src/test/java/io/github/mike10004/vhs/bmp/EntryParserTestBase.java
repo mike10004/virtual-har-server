@@ -9,10 +9,11 @@ import java.net.URI;
 
 import static org.junit.Assert.assertEquals;
 
-abstract class EntryParserTestBase<E> {
+public abstract class EntryParserTestBase<E> {
 
     protected abstract EntryParser<E> createParser();
 
+    @SuppressWarnings("SameParameterValue")
     protected abstract E createEntryWithRequest(String method, String url, String...headers);
 
     @Test

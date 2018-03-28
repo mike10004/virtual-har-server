@@ -2,10 +2,14 @@ package io.github.mike10004.vhs.harbridge.sstoehr;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.gson.Gson;
+import de.sstoehr.harreader.HarReader;
+import de.sstoehr.harreader.HarReaderMode;
+import de.sstoehr.harreader.model.Har;
 import de.sstoehr.harreader.model.HarContent;
 import de.sstoehr.harreader.model.HarEntry;
 import de.sstoehr.harreader.model.HarHeader;
@@ -22,14 +26,18 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -214,5 +222,76 @@ public class SstoehrHarBridgeTest {
         String responseDataContentTypeHeaderValue = responseData.getFirstHeaderValue(HttpHeaders.CONTENT_TYPE);
         assertNotNull("expect responseData to contain content-type header", responseDataContentTypeHeaderValue);
         assertEquals("responseData content-type header value", expectedResponseContentType, MediaType.parse(responseDataContentTypeHeaderValue));
+    }
+
+    @Test
+    public void getRequestData() throws Exception {
+        String requestJson = "{\n" +
+                "  \"method\": \"POST\",\n" +
+                "  \"url\": \"https://www.example.com/foo/bar\",\n" +
+                "  \"httpVersion\": \"HTTP/1.1\",\n" +
+                "  \"cookies\": [],\n" +
+                "  \"headers\": [\n" +
+                "    {\n" +
+                "      \"name\": \"Host\",\n" +
+                "      \"value\": \"www.example.com\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"Connection\",\n" +
+                "      \"value\": \"keep-alive\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"Content-Length\",\n" +
+                "      \"value\": \"116\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"X-ABCDEF-Protocol-Version\",\n" +
+                "      \"value\": \"Foo\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"User-Agent\",\n" +
+                "      \"value\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0 Safari/537.36\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"Content-Type\",\n" +
+                "      \"value\": \"multipart/mixed; boundary\\u003dABCDEF_1522096137171\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"Accept\",\n" +
+                "      \"value\": \"application/json, text/javascript, */*; q\\u003d0.01\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"X-Requested-With\",\n" +
+                "      \"value\": \"XMLHttpRequest\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"Accept-Encoding\",\n" +
+                "      \"value\": \"gzip, deflate, br\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"name\": \"Accept-Language\",\n" +
+                "      \"value\": \"en-US,en;q\\u003d0.9\"\n" +
+                "    }\n" +
+                "  ],\n" +
+                "  \"queryString\": [],\n" +
+                "  \"postData\": {\n" +
+                "    \"mimeType\": \"multipart/mixed; boundary\\u003dABCDEF_1522096137171\",\n" +
+                "    \"params\": [],\n" +
+                "    \"text\": \"--ABCDEF_1522096137171\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\n\\r\\nfoo\\u003dbar\\u0026baz\\u003dgaw\\r\\n--ABCDEF_1522096137171--\",\n" +
+                "    \"comment\": \"\"\n" +
+                "  },\n" +
+                "  \"headersSize\": 1891,\n" +
+                "  \"bodySize\": 116,\n" +
+                "  \"comment\": \"\"\n" +
+                "}";
+        SstoehrHarBridge bridge = new SstoehrHarBridge();
+        HarRequest request = new Gson().fromJson(requestJson, HarRequest.class);
+        HarEntry entry = new HarEntry();
+        entry.setRequest(request);
+        ByteSource byteSource = bridge.getRequestPostData(entry);
+        assertNotNull("post data byte source", byteSource);
+        byte[] expected = request.getPostData().getText().getBytes(StandardCharsets.US_ASCII);
+        assertEquals("post data bytes", BaseEncoding.base16().encode(expected), BaseEncoding.base16().encode(byteSource.read()));
+
     }
 }
