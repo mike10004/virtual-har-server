@@ -12,7 +12,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.junit.Assume;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -25,7 +24,6 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -53,8 +51,7 @@ public class MultipartFormDataTest {
     @Parameterized.Parameters
     public static List<MultipartFormData.FormDataParser> parsers() {
         return ImmutableList.copyOf(new MultipartFormData.FormDataParser[]{
-//                new MultipartFormData.NanohttpdFormDataParser(),
-//                new ApacheMultipartFormDataParser(() -> temporaryFolder.getRoot().toPath()),
+                new NanohttpdFormDataParser(),
                 new NettyMultipartFormDataParser(),
         });
     }

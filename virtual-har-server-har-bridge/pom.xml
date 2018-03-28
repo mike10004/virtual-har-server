@@ -96,11 +96,5 @@
             <artifactId>webdrivermanager</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.github.mike10004</groupId>
-            <artifactId>commons-fileupload-nonservlet</artifactId>
-            <version>1.3.3</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 </project>

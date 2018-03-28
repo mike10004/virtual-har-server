@@ -31,7 +31,7 @@ public class NettyMultipartFormDataParser implements MultipartFormData.FormDataP
     }
 
     @Override
-    public List<MultipartFormData.FormDataPart> decodeMultipartFormData(MediaType contentType, byte[] content) throws MultipartFormData.BadMultipartFormDataException, MultipartFormData.RuntimeIOException {
+    public List<MultipartFormData.FormDataPart> decodeMultipartFormData(MediaType contentType, byte[] content) throws MultipartFormData.BadMultipartFormDataException, NanohttpdFormDataParser.RuntimeIOException {
         HttpDataFactory dataFactory = new DefaultHttpDataFactory(false);
         HttpRequest request = mockRequest(contentType, content);
         HttpPostRequestDecoder decoder = new HttpPostRequestDecoder(dataFactory, request);
@@ -52,7 +52,7 @@ public class NettyMultipartFormDataParser implements MultipartFormData.FormDataP
                             break;
                     }
                 } catch (IOException e) {
-                    throw new MultipartFormData.RuntimeIOException("netty threw exception", e);
+                    throw new NanohttpdFormDataParser.RuntimeIOException("netty threw exception", e);
                 } finally {
                     data.release();
                 }
