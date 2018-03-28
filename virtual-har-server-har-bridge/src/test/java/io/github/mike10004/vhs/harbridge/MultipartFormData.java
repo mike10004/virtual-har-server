@@ -208,7 +208,7 @@ public class MultipartFormData {
         }
     }
 
-    private static class RuntimeIOException extends RuntimeException {
+    static class RuntimeIOException extends RuntimeException {
         public RuntimeIOException(String message, IOException cause) {
             super(message, cause);
         }
