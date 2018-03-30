@@ -3,6 +3,7 @@ package io.github.mike10004.vhs.harbridge;
 import com.google.common.net.MediaType;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +56,12 @@ public interface MultipartFormDataParser {
 
         public MalformedMultipartFormDataException(String message) {
             super(message);
+        }
+    }
+
+    class RuntimeIOException extends RuntimeException {
+        public RuntimeIOException(String message, IOException cause) {
+            super(message, cause);
         }
     }
 }

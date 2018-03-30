@@ -1,7 +1,8 @@
-package io.github.mike10004.vhs.testsupport;
+package io.github.mike10004.vhs.bmp;
 
 import io.github.mike10004.vhs.harbridge.FormDataPart;
 import io.github.mike10004.vhs.harbridge.MultipartFormDataParser;
+import io.github.mike10004.vhs.testsupport.MultipartFormDataParserTestBase;
 
 import java.io.IOException;
 import java.nio.charset.Charset;

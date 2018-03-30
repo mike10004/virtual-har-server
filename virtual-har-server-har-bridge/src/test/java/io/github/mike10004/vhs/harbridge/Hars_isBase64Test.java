@@ -25,10 +25,13 @@ public class Hars_isBase64Test {
     @Parameterized.Parameters
     public static List<TestCase> testCases() {
         return ImmutableList.copyOf(new TestCase[]{
-                new TestCase("text/plain", "abcd", null, 3L, false),
+                new TestCase("text/plain", "abcd", null, 4L, false),
                 new TestCase("text/plain", "abcd", null, null, false),
+                new TestCase("text/plain", "abcdabcdabcd", null, 9L, true),
+                new TestCase("text/plain", "abcdabcdabcd", null, 12L, false),
                 new TestCase("text/plain", "abcd", "base64", null, true),
                 new TestCase("text/plain", "abcd", "base64", 3L, true),
+                new TestCase("text/plain", "abcd", "base64", null, true),
                 new TestCase("application/octet-stream", "abcd", null, null, true),
                 new TestCase("application/x-not-already-known", "ThisIsAllBase64Alphabet", null, null, false),
                 new TestCase("application/x-not-already-known", "ThisIsAllBase64Alphabet", "base64", null, true),

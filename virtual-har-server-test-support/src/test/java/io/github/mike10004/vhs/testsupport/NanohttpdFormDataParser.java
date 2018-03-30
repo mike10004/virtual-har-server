@@ -219,12 +219,6 @@ class NanohttpdFormDataParser implements MultipartFormDataParser {
         return parts;
     }
 
-    static class RuntimeIOException extends RuntimeException {
-        public RuntimeIOException(String message, IOException cause) {
-            super(message, cause);
-        }
-    }
-
     private static class MemoryBufferedReader extends BufferedReader {
 
         public MemoryBufferedReader(byte[] data, int offset, int len, Charset charset, int sz) {

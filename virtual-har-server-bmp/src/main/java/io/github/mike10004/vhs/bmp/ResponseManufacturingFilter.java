@@ -305,7 +305,7 @@ class ResponseManufacturingFilter extends HttpsAwareFiltersAdapter {
             if (scheme == null) {
                 return null;
             }
-            return defaultPortByScheme.get(scheme);
+            return defaultPortByScheme.get(scheme.toLowerCase());
         }
 
         // https://gist.github.com/mahmoud/2fe281a8daaff26cfe9c15d2c5bf5c8b

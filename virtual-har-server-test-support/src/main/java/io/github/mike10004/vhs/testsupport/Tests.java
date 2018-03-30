@@ -107,10 +107,6 @@ public class Tests {
         return copyFileFromClasspath("/image-for-upload.jpg", "image-for-upload", ".jpeg", directory);
     }
 
-    public static File copyFileUploadExampleHar(Path directory) throws IOException {
-        return copyFileFromClasspath("/file-upload-example.har", "file-upload-example", ".har", directory);
-    }
-
     @SuppressWarnings("SameParameterValue")
     static File copyFileFromClasspath(String resourcePath, String prefix, String suffix, Path tempdir) throws IOException {
         URL resource = Tests.class.getResource(resourcePath);

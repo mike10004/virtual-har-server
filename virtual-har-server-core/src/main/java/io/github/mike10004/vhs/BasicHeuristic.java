@@ -9,6 +9,7 @@ import com.google.common.collect.Multiset;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
+import io.github.mike10004.vhs.harbridge.FormDataPart;
 import io.github.mike10004.vhs.harbridge.HttpMethod;
 import io.github.mike10004.vhs.harbridge.ParsedRequest;
 import io.github.mike10004.vhs.repackaged.org.apache.http.client.utils.URLEncodedUtils;
@@ -219,11 +220,19 @@ public class BasicHeuristic implements Heuristic {
                 return increment;
             }
         }
+        // TODO examine content types here and return 0 score early if they're very different
         @Nullable Multimap<String, Optional<String>> entryParams = parseIfWwwFormData(entryBody, entryContentType);
-        if (entryParams != null) { // then it's form data
+        if (entryParams != null) {
             @Nullable Multimap<String, Optional<String>> requestParams = parseIfWwwFormData(requestBody, requestContentType);
             if (requestParams != null) {
                 return rateQuerySameness(entryParams, requestParams);
+            }
+        }
+        @Nullable Multiset<FormDataPart> entryFormData = parseIfMultipartFormData(entryBody, entryContentType);
+        if (entryFormData != null) {
+            @Nullable Multiset<FormDataPart> requestFormData = parseIfMultipartFormData(requestBody, requestContentType);
+            if (requestFormData != null) {
+                return rateFormDataSameness(entryFormData, requestFormData);
             }
         }
         try {
@@ -231,6 +240,21 @@ public class BasicHeuristic implements Heuristic {
         } catch (IOException e) {
             return 0;
         }
+    }
+
+    @Nullable
+    @SuppressWarnings("unused")
+    protected Multiset<FormDataPart> parseIfMultipartFormData(ByteSource body, @Nullable String contentType) {
+        // TODO implement multipart/form-data parsing and comparison
+        //      and then remove "unused" warning suppression
+        return null;
+    }
+
+    @SuppressWarnings("unused")
+    protected int rateFormDataSameness(Multiset<FormDataPart> entryFormData, Multiset<FormDataPart> requestFormData) {
+        // TODO implement rating form-data sameness
+        //      and then remove "unused" warning suppression
+        return 0;
     }
 
     private static ByteSource getBodyAsByteSource(ParsedRequest request) {

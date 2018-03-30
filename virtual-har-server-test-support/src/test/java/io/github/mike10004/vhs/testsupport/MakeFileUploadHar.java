@@ -100,7 +100,7 @@ public class MakeFileUploadHar {
 
     @SuppressWarnings("UnusedReturnValue")
     public static net.lightbody.bmp.core.har.Har main(Charset harOutputCharset, File binaryFile) throws IOException, InterruptedException {
-        File harFile = File.createTempFile("file-upload-example", ".har");
+        File harFile = File.createTempFile("traffic-with-file-upload", ".har");
         int port = 49111;
         int proxyPort = 60999;
         String landingHtml = "<!DOCTYPE html>\n" +
