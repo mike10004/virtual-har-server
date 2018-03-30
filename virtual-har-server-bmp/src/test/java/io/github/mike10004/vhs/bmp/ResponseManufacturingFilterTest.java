@@ -99,11 +99,13 @@ public class ResponseManufacturingFilterTest {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public T getAndRemove() {
             throw new UnsupportedOperationException();
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void remove() {
             throw new UnsupportedOperationException();
         }

@@ -1,10 +1,14 @@
-package io.github.mike10004.vhs.harbridge;
+package io.github.mike10004.vhs.testsupport;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteSource;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
+import io.github.mike10004.vhs.harbridge.ContentDisposition;
+import io.github.mike10004.vhs.harbridge.FormDataPart;
+import io.github.mike10004.vhs.harbridge.MultipartFormDataParser;
+import io.github.mike10004.vhs.harbridge.TypedContent;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
@@ -22,7 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NettyMultipartFormDataParser implements MultipartFormData.FormDataParser {
+public class NettyMultipartFormDataParser implements MultipartFormDataParser {
 
     protected HttpRequest mockRequest(MediaType contentType, byte[] data) {
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.POST, "", Unpooled.wrappedBuffer(data));
@@ -31,11 +35,11 @@ public class NettyMultipartFormDataParser implements MultipartFormData.FormDataP
     }
 
     @Override
-    public List<MultipartFormData.FormDataPart> decodeMultipartFormData(MediaType contentType, byte[] content) throws MultipartFormData.BadMultipartFormDataException, NanohttpdFormDataParser.RuntimeIOException {
+    public List<FormDataPart> decodeMultipartFormData(MediaType contentType, byte[] content) throws BadMultipartFormDataException, NanohttpdFormDataParser.RuntimeIOException {
         HttpDataFactory dataFactory = new DefaultHttpDataFactory(false);
         HttpRequest request = mockRequest(contentType, content);
         HttpPostRequestDecoder decoder = new HttpPostRequestDecoder(dataFactory, request);
-        List<MultipartFormData.FormDataPart> parts = new ArrayList<>();
+        List<FormDataPart> parts = new ArrayList<>();
         while (decoder.hasNext()) {
             InterfaceHttpData data = decoder.next();
             if (data != null) {
@@ -61,11 +65,11 @@ public class NettyMultipartFormDataParser implements MultipartFormData.FormDataP
         return parts;
     }
 
-    protected void handleInternalAttribute(List<MultipartFormData.FormDataPart> parts, InterfaceHttpData attr) {
+    protected void handleInternalAttribute(List<FormDataPart> parts, InterfaceHttpData attr) {
         System.out.format("handleInternalAttribute (%s) %s%n", attr.getClass(), attr);
     }
 
-    protected void handleAttribute(List<MultipartFormData.FormDataPart> parts, Attribute attr) throws IOException {
+    protected void handleAttribute(List<FormDataPart> parts, Attribute attr) throws IOException {
         parts.add(toFormDataPart(attr, null));
     }
 
@@ -77,7 +81,7 @@ public class NettyMultipartFormDataParser implements MultipartFormData.FormDataP
         return null;
     }
 
-    protected MultipartFormData.FormDataPart toFormDataPart(HttpData httpData, @Nullable String partContentType) throws IOException {
+    protected FormDataPart toFormDataPart(HttpData httpData, @Nullable String partContentType) throws IOException {
         byte[] parsedContent = httpData.get();
         TypedContent file = TypedContent.identity(ByteSource.wrap(parsedContent), partContentType);
         String name = httpData.getName();
@@ -86,10 +90,10 @@ public class NettyMultipartFormDataParser implements MultipartFormData.FormDataP
                 .name(name)
                 .build();
         Multimap<String, String> headers = ArrayListMultimap.create();
-        return new MultipartFormData.FormDataPart(headers, disposition, file);
+        return new FormDataPart(headers, disposition, file);
     }
 
-    protected void handleFileUpload(List<MultipartFormData.FormDataPart> parts, FileUpload fileUpload) throws IOException {
+    protected void handleFileUpload(List<FormDataPart> parts, FileUpload fileUpload) throws IOException {
         parts.add(toFormDataPart(fileUpload, fileUpload.getContentType()));
     }
 

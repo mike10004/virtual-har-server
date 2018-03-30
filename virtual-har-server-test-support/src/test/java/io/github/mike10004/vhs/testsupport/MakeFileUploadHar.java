@@ -33,10 +33,12 @@
  * #L%
  */
 
-package io.github.mike10004.vhs.harbridge;
+package io.github.mike10004.vhs.testsupport;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.common.io.Files;
+import com.google.common.io.Resources;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Ints;
@@ -44,11 +46,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import fi.iki.elonen.NanoHTTPD;
 import io.github.bonigarcia.wdm.ChromeDriverManager;
+import io.github.mike10004.vhs.harbridge.FormDataPart;
+import io.github.mike10004.vhs.harbridge.MultipartFormDataParser;
+import io.github.mike10004.vhs.harbridge.TypedContent;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.core.har.HarEntry;
 import net.lightbody.bmp.proxy.CaptureType;
-import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -86,9 +90,12 @@ import static java.util.Objects.requireNonNull;
  * Run this program and record a HAR in Chrome to create a HAR that contains a simple file upload.
  */
 public class MakeFileUploadHar {
+
     public static void main(String[] args) throws Exception {
-        File binaryFile = MultipartFormDataTest.copyImageForUpload(FileUtils.getTempDirectory().toPath());
+        File binaryFile = File.createTempFile("image-file-for-upload", ".jpeg");
+        Resources.asByteSource(MakeFileUploadHar.class.getResource("/image-for-upload.jpg")).copyTo(Files.asByteSink(binaryFile));
         main(StandardCharsets.UTF_8, binaryFile);
+        binaryFile.deleteOnExit();
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -120,7 +127,7 @@ public class MakeFileUploadHar {
                 } else if ("/file".equals(uri.getPath())) {
                     return serveFileById(storage, session.getParameters().get("id").stream().findFirst().orElse(null));
                 } else {
-                    return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.NOT_FOUND, "text/plain", "404 Not Found");
+                    return newFixedLengthResponse(NanoHTTPD.Response.Status.NOT_FOUND, "text/plain", "404 Not Found");
                 }
             }
         };
@@ -302,12 +309,12 @@ public class MakeFileUploadHar {
             if (boundary == null) {
                 return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.BAD_REQUEST, "text/plain", "Bad Request: Content type is multipart/form-data but boundary missing");
             }
-            List<MultipartFormData.FormDataPart> formDataParts;
+            List<FormDataPart> formDataParts;
             try {
-                formDataParts = MultipartFormData.getParser().decodeMultipartFormData(contentType, data);
-            } catch (MultipartFormData.BadMultipartFormDataException e) {
+                formDataParts = new NanohttpdFormDataParser().decodeMultipartFormData(contentType, data);
+            } catch (MultipartFormDataParser.BadMultipartFormDataException e) {
                 e.printStackTrace(System.err);
-                return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.lookup(MultipartFormData.BadMultipartFormDataException.STATUS_CODE), "text/plain", e.getMessage());
+                return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.lookup(MultipartFormDataParser.BadMultipartFormDataException.STATUS_CODE), "text/plain", e.getMessage());
             }
             System.out.format("%d parts parsed from request body%n", formDataParts.size());
             formDataParts.forEach(part -> {

@@ -1,28 +1,24 @@
-package io.github.mike10004.vhs.harbridge;
+package io.github.mike10004.vhs.testsupport;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.common.io.Files;
-import com.google.common.io.Resources;
 import com.google.common.net.MediaType;
 import com.google.common.primitives.Bytes;
+import io.github.mike10004.vhs.harbridge.FormDataPart;
+import io.github.mike10004.vhs.harbridge.MultipartFormDataParser;
+import io.github.mike10004.vhs.harbridge.TypedContent;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.junit.Assume;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -34,29 +30,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-@RunWith(Parameterized.class)
-public class MultipartFormDataTest {
+public abstract class MultipartFormDataParserTestBase {
 
     private static final boolean DUMP_FILE_WITH_UNEXPECTED_CONTENT_FOR_DEBUGGING = false;
 
     @ClassRule
     public static TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    private final MultipartFormData.FormDataParser formDataParser;
-
-    public MultipartFormDataTest(MultipartFormData.FormDataParser formDataParser) {
-        this.formDataParser = formDataParser;
+    public MultipartFormDataParserTestBase( ) {
     }
 
-    @Parameterized.Parameters
-    public static List<MultipartFormData.FormDataParser> parsers() {
-        return ImmutableList.copyOf(new MultipartFormData.FormDataParser[]{
-                new NanohttpdFormDataParser(),
-                new NettyMultipartFormDataParser(),
-        });
-    }
+    protected abstract MultipartFormDataParser createParser();
 
-    private void assertFormDataPartEquals(MultipartFormData.FormDataPart part, Predicate<? super MediaType> mediaTypeTester, String paramName, String filename) {
+    private void assertFormDataPartEquals(FormDataPart part, Predicate<? super MediaType> mediaTypeTester, String paramName, String filename) {
         assertNotNull("content disposition", part.contentDisposition);
         assertEquals("param name", paramName, part.contentDisposition.getName());
         assertEquals("filename", filename, part.contentDisposition.getFilename());
@@ -70,27 +56,30 @@ public class MultipartFormDataTest {
         testDecode(requestBodyFixture);
     }
 
+    protected abstract String decodeParamPartData(FormDataPart paramPart) throws IOException;
+
     private void testDecode(TestCase testCase) throws IOException {
         MediaType contentType = testCase.getContentType();
         byte[] data = testCase.asByteSource().read();
         System.out.format("full data size: %s%n", data.length);
-        List<MultipartFormData.FormDataPart> parts = formDataParser.decodeMultipartFormData(contentType, data);
+        MultipartFormDataParser formDataParser = createParser();
+        List<FormDataPart> parts = formDataParser.decodeMultipartFormData(contentType, data);
         for (int i = 0; i < parts.size() ;i++) {
             System.out.format("part[%d] = %s%n", i, parts.get(i));
         }
         assertEquals("num parts", 2, parts.size());
-        MultipartFormData.FormDataPart paramPart = parts.get(1);
+        FormDataPart paramPart = parts.get(1);
         assertFormDataPartEquals(paramPart, Objects::nonNull, "tag", null);
         assertNotNull(paramPart.file);
-        String paramValue = paramPart.file.asByteSource().asCharSource(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING).read();
+        String paramValue = decodeParamPartData(paramPart); // paramPart.file.asByteSource().asCharSource(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING).read();
         String expectedParamValue = testCase.getExpectedParamValue();
-        System.out.format("param value:%n  expect %s%n  actual %s%n", Arrays.toString(expectedParamValue.getBytes(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING)), Arrays.toString(paramValue.getBytes(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING)));
+        // System.out.format("param value:%n  expect %s%n  actual %s%n", Arrays.toString(expectedParamValue.getBytes(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING)), Arrays.toString(paramValue.getBytes(MultipartFormData.URLENCODED_FORM_DATA_DEFAULT_ENCODING)));
         assertEquals("param value", expectedParamValue, paramValue);
-        MultipartFormData.FormDataPart filePart = parts.get(0);
+        FormDataPart filePart = parts.get(0);
         assertFormDataPartEquals(filePart, Objects::nonNull, "f", "image-for-upload3965121338549146845.jpeg");
         assertNotNull(filePart.file);
         byte[] fileBytes = filePart.file.asByteSource().read();
-        File imageFile = copyImageForUpload(FileUtils.getTempDirectory().toPath());
+        File imageFile = Tests.copyImageForUpload(FileUtils.getTempDirectory().toPath());
         byte[] expectedFileBytes = java.nio.file.Files.readAllBytes(imageFile.toPath());
         if (DUMP_FILE_WITH_UNEXPECTED_CONTENT_FOR_DEBUGGING) {
             if (!Arrays.equals(expectedFileBytes, fileBytes)) {
@@ -128,21 +117,6 @@ public class MultipartFormDataTest {
                     "can do about a HAR that was created in a way that may have lost some of the original request data", e);
         }
 
-    }
-
-    static File copyImageForUpload(Path directory) throws IOException {
-        return copyFileFromClasspath("/image-for-upload.jpg", "image-for-upload", ".jpeg", directory);
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    private static File copyFileFromClasspath(String resourcePath, String prefix, String suffix, Path tempdir) throws IOException {
-        URL resource = MakeFileUploadHar.class.getResource(resourcePath);
-        if (resource == null) {
-            throw new FileNotFoundException(resourcePath);
-        }
-        File file = File.createTempFile(prefix, suffix, tempdir.toFile());
-        Resources.asByteSource(resource).copyTo(Files.asByteSink(file));
-        return file;
     }
 
     private static final String CONTENT_TYPE_NO_BOUNDARY = "multipart/form-data";
@@ -192,7 +166,7 @@ public class MultipartFormDataTest {
         System.out.format("String expectedParamValue = \"%s\"; // contains %s%n", StringEscapeUtils.escapeJava(expectedParamValue), gnarlyString);
         byte[] expectedParamValueBytes = expectedParamValue.getBytes(UTF_8);
         System.out.format("byte[] expectedParamValueBytes = {%s};%n", Joiner.on(", ").join(Bytes.asList(expectedParamValueBytes)));
-        File imageFile = copyImageForUpload(temporaryFolder.getRoot().toPath());
+        File imageFile = Tests.copyImageForUpload(temporaryFolder.getRoot().toPath());
         Charset TEXT_CHARSET = UTF_8;
         String boundary = "----WebKitFormBoundarykWXf2mC9KePVVkV6";
         MediaType contentType = MediaType.parse(CONTENT_TYPE_NO_BOUNDARY).withParameter("boundary", boundary);

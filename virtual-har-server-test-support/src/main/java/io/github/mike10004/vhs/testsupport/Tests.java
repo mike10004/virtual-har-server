@@ -112,7 +112,7 @@ public class Tests {
     }
 
     @SuppressWarnings("SameParameterValue")
-    private static File copyFileFromClasspath(String resourcePath, String prefix, String suffix, Path tempdir) throws IOException {
+    static File copyFileFromClasspath(String resourcePath, String prefix, String suffix, Path tempdir) throws IOException {
         URL resource = Tests.class.getResource(resourcePath);
         if (resource == null) {
             throw new FileNotFoundException(resourcePath);
