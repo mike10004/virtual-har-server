@@ -1,3 +1,5 @@
 language: java
 notifications:
   email: false
+install: mvn -B dependency:resolve
+script: mvn -B install -Dvhs.additionalChromeArgs=--no-sandbox

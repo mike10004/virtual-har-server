@@ -13,7 +13,6 @@ import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.model.Har;
 import de.sstoehr.harreader.model.HarHeader;
 import de.sstoehr.harreader.model.HarResponse;
-import io.github.bonigarcia.wdm.ChromeDriverManager;
 import io.github.mike10004.vhs.VirtualHarServer;
 import io.github.mike10004.vhs.VirtualHarServerControl;
 import io.github.mike10004.vhs.harbridge.HttpContentCodec;
@@ -58,19 +57,18 @@ public class BrEncodedResponseTest {
 
     @Test
     public void seeBrEncodedResponse_chrome() throws Exception {
-        ChromeDriverManager.getInstance().version("2.36").setup();
+        BmpTests.configureJvmForChromedriver();
         seeBrEncodedResponse((proxyAddress, url) -> {
             Map<String, String> env = xvfbRule.getController().newEnvironment();
             ChromeDriverService service = new ChromeDriverService.Builder()
                     .usingAnyFreePort()
                     .withEnvironment(env)
                     .build();
-            ChromeOptions options = new ChromeOptions();
+            ChromeOptions options = BmpTests.createDefaultChromeOptions();
             options.addArguments("--proxy-server=" + proxyAddress);
             WebDriver driver = new ChromeDriver(service, options);
             try {
                 driver.get(url.toString());
-//                new java.util.concurrent.CountDownLatch(1).await();
                 WebElement body = driver.findElement(By.tagName("body"));
                 return body.getText();
             } finally {
