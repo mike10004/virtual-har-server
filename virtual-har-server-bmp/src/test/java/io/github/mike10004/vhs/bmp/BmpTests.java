@@ -57,6 +57,7 @@ public class BmpTests {
     public static ChromeOptions createDefaultChromeOptions() {
         ChromeOptions options = new ChromeOptions();
         List<String> additionalChromeArgs = detectAdditionalChromeArgs();
+        System.out.format("additional chrome arguments to be used: %s%n", additionalChromeArgs);
         options.addArguments(additionalChromeArgs);
         return options;
     }
