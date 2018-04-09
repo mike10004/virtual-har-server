@@ -13,6 +13,7 @@ import de.sstoehr.harreader.jackson.ExceptionIgnoringIntegerDeserializer;
 import de.sstoehr.harreader.jackson.MapperFactory;
 import de.sstoehr.harreader.model.HarEntry;
 import io.github.bonigarcia.wdm.ChromeDriverManager;
+import io.github.bonigarcia.wdm.WebDriverManager;
 import io.github.mike10004.vhs.BasicHeuristic;
 import io.github.mike10004.vhs.EntryMatcher;
 import io.github.mike10004.vhs.EntryMatcherFactory;
@@ -38,20 +39,21 @@ import static java.util.Objects.requireNonNull;
 
 public class BmpTests {
 
-    private static final String SYSPROP_ADDITIONAL_CHROME_ARGS = "vhs.additionalChromeArgs";
-
+    private static final String SYSPROP_ADDITIONAL_CHROME_ARGS = "vhs.chromedriver.chrome.extraArgs";
+    private static final String SYSPROP_CHROMEDRIVER_VERISON = "vhs.chromedriver.version";
     private BmpTests() {}
 
     private static final KeystoreDataCache keystoreDataCache =
             new KeystoreDataCache(new JreKeystoreGenerator(KeystoreType.PKCS12,
                     new Random(KeystoreDataCache.class.getName().hashCode())));
 
-    private static String getKnownChromedriverVersion() {
-        return "2.37";
-    }
-
     public static void configureJvmForChromedriver() {
-        ChromeDriverManager.getInstance().version(getKnownChromedriverVersion()).setup();
+        WebDriverManager wdm = ChromeDriverManager.getInstance();
+        String chromedriverVersion = System.getProperty(SYSPROP_CHROMEDRIVER_VERISON, "");
+        if (!chromedriverVersion.trim().isEmpty()) {
+            wdm.version(chromedriverVersion);
+        }
+        wdm.setup();
     }
 
     public static ChromeOptions createDefaultChromeOptions() {
